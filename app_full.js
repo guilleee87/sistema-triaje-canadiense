@@ -4128,12 +4128,16 @@ function recalcularPrioridad() {
   // - CTAS 2 a 5: Pasa a Cola Priorizada / Tópico de Evaluación (consume 0 camas).
   // =========================================================================
   if (prio === "I" || STATE.ingresoDirectoCritico || STATE.panicoShockTrauma) {
-    const stId = (typeof RECURSOS_HOSPITALARIOS !== "undefined" && RECURSOS_HOSPITALARIOS["ST-01"] && RECURSOS_HOSPITALARIOS["ST-01"].estado === "disponible") ? "ST-01" : "ST-02";
+    let stId = STATE.camaAsignadaId;
+    // Si ya tenía asignada una cama ST válida, mantenerla para no duplicar ocupación
+    if (!stId || !stId.startsWith("ST-") || stId === "SIN-CAMA") {
+      stId = (typeof RECURSOS_HOSPITALARIOS !== "undefined" && RECURSOS_HOSPITALARIOS["ST-01"] && RECURSOS_HOSPITALARIOS["ST-01"].estado === "disponible") ? "ST-01" : "ST-02";
+    }
     if (typeof RECURSOS_HOSPITALARIOS !== "undefined" && RECURSOS_HOSPITALARIOS[stId]) {
       STATE.camaAsignadaId = stId;
-      STATE.camaAsignada = RECURSOS_HOSPITALARIOS[stId].nombre || "Trauma Shock ST-01";
+      STATE.camaAsignada = RECURSOS_HOSPITALARIOS[stId].nombre || `Trauma Shock ${stId}`;
       RECURSOS_HOSPITALARIOS[stId].estado = "ocupada";
-      RECURSOS_HOSPITALARIOS[stId].paciente = { id: STATE.id || pacienteActivoId, nombre: STATE.nombreReniec || STATE.identificador };
+      RECURSOS_HOSPITALARIOS[stId].paciente = { id: STATE.id || pacienteActivoId || STATE.identificador, nombre: STATE.nombreReniec || STATE.identificador };
     }
   } else {
     // Si tenía una cama asignada previa en triaje, liberarla
@@ -10068,7 +10072,7 @@ function mostrarToastCola(htmlMsg) {
   if (!toast) {
     toast = document.createElement("div");
     toast.id = "toast_cola_msg";
-    toast.style.cssText = "position:fixed; top:54px; right:20px; z-index:99999; background:#0f172a; color:#ffffff; padding:12px 18px; border-radius:10px; border-left:4px solid #0284c7; box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:0.85rem; max-width:420px; transition:all 0.3s ease;";
+    toast.style.cssText = "position:fixed; top:54px; right:20px; z-index:99999; background:#0f172a; color:#ffffff; padding:12px 18px; border-radius:10px; border-left:4px solid #0284c7; box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:0.85rem; max-width:360px; transition:all 0.3s ease;";
     document.body.appendChild(toast);
   }
   toast.innerHTML = htmlMsg;
@@ -11846,7 +11850,7 @@ function construirHTMLBrazalete(esTemporal = false) {
   const esRealmenteTemporal = Boolean(esTemporal || STATE.esNN || !STATE.numDni || STATE.numDni === "NN" || docPaciente.startsWith("S/D") || hcPaciente.includes("TEMP") || hcPaciente.includes("NN"));
 
   return `
-    <div class="wristband-strip" style="width:960px; max-width:100%; height:148px; max-height:148px; background:#ffffff; border:2px solid #94a3b8; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); display:flex; position:relative; overflow:hidden; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box; margin:auto;">
+    <div class="wristband-strip" style="width:880px; max-width:100%; height:138px; max-height:138px; box-sizing:border-box; background:#ffffff; border:2px solid #94a3b8; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.15); display:flex; position:relative; overflow:hidden; font-family:Arial, Helvetica, sans-serif; box-sizing:border-box; margin:auto;">
       
       <!-- 1. BANDA LATERAL CON COLOR DE TRIAJE -->
       <div class="band-triage" style="width:60px; min-width:60px; height:100%; background:${colorBanda}; color:#ffffff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-weight:900; text-align:center; padding:4px; box-sizing:border-box; border-right:2px solid rgba(0,0,0,0.15);">
@@ -11869,7 +11873,7 @@ function construirHTMLBrazalete(esTemporal = false) {
         <!-- DATOS DEL PACIENTE: NOMBRE Y UBICACIÓN -->
         <div class="patient-main" style="margin:2px 0;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="patient-name" style="font-size:15px; font-weight:900; color:#0f172a; line-height:1.2; letter-spacing:0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px;">
+            <div class="patient-name" style="font-size:15px; font-weight:900; color:#0f172a; line-height:1.2; letter-spacing:0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:360px;">
               ${STATE.esNN ? (STATE.esNNInconsciente ? '🚨 ' : '👤 ') : ''}${nombrePaciente}
             </div>
             <div style="font-size:9.5px; font-weight:800; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; padding:2px 6px; border-radius:4px; white-space:nowrap;">
@@ -11912,7 +11916,7 @@ function construirHTMLBrazalete(esTemporal = false) {
       </div>
 
       <!-- 4. ZONA DE TRASLAPE Y CIERRE ADHESIVO (NO CUBRE CÓDIGO DE BARRAS) -->
-      <div class="wristband-closure-area" style="width:175px; min-width:175px; height:100%; background:#f8fafc; padding:8px 10px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; box-sizing:border-box;">
+      <div class="wristband-closure-area" style="width:150px; min-width:150px; height:100%; background:#f8fafc; padding:8px 10px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; box-sizing:border-box;">
         <div style="font-size:9px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:4px;">
           <span>🔒</span> <span>ÁREA DE TRASLAPE</span>
         </div>
@@ -11995,11 +11999,12 @@ function imprimirBrazaleteDirecto() {
       <meta charset="UTF-8">
       <title>Brazalete Hospitalario — ${hcPaciente}</title>
       <style>
-        @page { size: landscape; margin: 0; }
-        body {
+        @page { size: landscape; margin: 6mm; }
+        *, *:before, *:after { box-sizing: border-box; }
+        html, body {
           font-family: Arial, Helvetica, sans-serif;
           margin: 0;
-          padding: 24px;
+          padding: 12px;
           background: #e2e8f0;
           display: flex;
           flex-direction: column;
@@ -12008,15 +12013,41 @@ function imprimirBrazaleteDirecto() {
           min-height: 100vh;
         }
         .instruction-box {
-          margin-bottom: 16px;
-          font-size: 13px;
+          margin-bottom: 14px;
+          font-size: 12px;
           color: #475569;
           text-align: center;
+          max-width: 880px;
+        }
+        .wristband-strip {
+          box-sizing: border-box !important;
+          width: 880px !important;
+          max-width: 98vw !important;
+          height: 138px !important;
+          max-height: 138px !important;
+          margin: 0 auto !important;
         }
         @media print {
-          body { background: #ffffff; padding: 0; margin: 0; }
-          .instruction-box { display: none; }
-          .wristband-strip { box-shadow: none !important; border: 1px solid #000 !important; width: 960px !important; margin: 20px auto !important; }
+          html, body {
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            min-height: auto !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .instruction-box { display: none !important; }
+          .wristband-strip {
+            box-shadow: none !important;
+            border: 1.5px solid #000 !important;
+            width: 880px !important;
+            max-width: 100% !important;
+            height: 138px !important;
+            max-height: 138px !important;
+            margin: 6mm auto !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
         }
       </style>
     </head>
