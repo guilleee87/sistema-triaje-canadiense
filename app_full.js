@@ -10816,6 +10816,598 @@ function crearPerfilEPS(nombreAseguradora, numDni, rndCode, rndPoliza, planNivel
   };
 }
 
+function crearPadronDesdeSeguroExistente(numDni, seguro) {
+  const s = String(seguro || "").toLowerCase();
+  const rndCode = Math.floor(1000 + Math.random() * 9000);
+  const rndSiteds = Math.floor(10000 + Math.random() * 90000);
+
+  if (s.includes("sis") || s.includes("minsa")) {
+    return {
+      dni: numDni,
+      tipo_aseguramiento: "SOLO_SIS",
+      condicion_evento: "NORMAL",
+      publico: { entidad: "SIS", regimen: "SIS Gratuito / Para Todos", estado: "ACTIVO", codigo: `FUA-2026-${rndCode}` },
+      privado: { iafas_eps: "SIN COBERTURA PRIVADA (AFILIADO SIS)", estado_poliza: "INACTIVA", copago_fijo: 0, coaseguro_pct: 1.0, exclusiones: [] },
+      origen_registro: "BD_HISTORICA"
+    };
+  } else if (s.includes("essalud")) {
+    return {
+      dni: numDni,
+      tipo_aseguramiento: "SOLO_ESSALUD",
+      condicion_evento: "NORMAL",
+      publico: { entidad: "ESSALUD", regimen: "EsSalud Regular Titular", estado: "ACTIVO", codigo: `AUT-ESS-${rndCode}` },
+      privado: { iafas_eps: "SIN COBERTURA EPS (SOLO ESSALUD)", estado_poliza: "INACTIVA", copago_fijo: 0, coaseguro_pct: 1.0, exclusiones: [] },
+      origen_registro: "BD_HISTORICA"
+    };
+  } else if (s.includes("eps") || s.includes("pacifico") || s.includes("rimac") || s.includes("mapfre") || s.includes("sanitas")) {
+    const iafas = s.includes("rimac") ? "Rímac EPS" : s.includes("mapfre") ? "Mapfre EPS" : s.includes("sanitas") ? "Sanitas Perú" : "Pacífico EPS";
+    return {
+      dni: numDni,
+      tipo_aseguramiento: "EPS_Y_ESSALUD",
+      condicion_evento: "NORMAL",
+      publico: { entidad: "ESSALUD", regimen: "EsSalud Activo (Vínculo Laboral EPS)", estado: "ACTIVO", codigo: `AUT-ESS-${rndCode}` },
+      privado: { siteds_codigo: `SITEDS-2026-${rndSiteds}`, iafas_eps: iafas, plan_salud: "Plan Red Preferente", estado_poliza: "ACTIVA", copago_fijo: 60.00, coaseguro_pct: 0.15, exclusiones: [] },
+      origen_registro: "BD_HISTORICA"
+    };
+  } else if (s.includes("privad")) {
+    return {
+      dni: numDni,
+      tipo_aseguramiento: "SOLO_PRIVADO",
+      condicion_evento: "NORMAL",
+      publico: { entidad: "NINGUNA (TIENE SEGURO PRIVADO)", regimen: "No Acreditado en Estado", estado: "INACTIVO", codigo: null },
+      privado: { siteds_codigo: `SITEDS-2026-${rndSiteds}`, iafas_eps: "Rímac EPS", plan_salud: "Plan Individual Preferente", estado_poliza: "ACTIVA", copago_fijo: 80.00, coaseguro_pct: 0.20, exclusiones: [] },
+      origen_registro: "BD_HISTORICA"
+    };
+  } else {
+    return {
+      dni: numDni,
+      tipo_aseguramiento: "SIN_SEGURO",
+      condicion_evento: "NORMAL",
+      publico: { entidad: "NINGUNA", regimen: "PARTICULAR NO ASEGURADO", estado: "INACTIVO", codigo: null },
+      privado: { iafas_eps: "PARTICULAR (SIN SEGURO)", estado_poliza: "INACTIVA", copago_fijo: 0, coaseguro_pct: 1.0, exclusiones: [] },
+      origen_registro: "BD_HISTORICA"
+    };
+  }
+}
+
+async function obtenerOGenerarPadronSusalud(dni) {
+  if (!dni || String(dni).toUpperCase().startsWith("NN") || STATE.esNN) {
+    return null; // Excepción NN: no se guarda en padrón definitivo
+  }
+
+  const numDni = String(dni).replace(/\D/g, "");
+  if (numDni.length !== 8) return null;
+
+  // PASO 1: Buscar DNI en Base de Datos (localStorage / Supabase)
+  try {
+    const rawLocal = localStorage.getItem("padron_susalud_" + numDni);
+    if (rawLocal) {
+      const obj = JSON.parse(rawLocal);
+      if (obj && obj.publico && obj.privado) {
+        obj.origen_registro = "BD_HISTORICA";
+        console.log(`💾 Padrón SUSALUD cargado desde BD Histórica (Local) para DNI ${numDni}:`, obj);
+        return obj;
+      }
+    }
+  } catch (e) {}
+
+  // PASO 1.5: Si no tiene padrón JSON pero ya tenía Historia Clínica / Seguro en BD
+  try {
+    const seguroPrevio = localStorage.getItem("seguro_asignado_" + numDni);
+    if (seguroPrevio && seguroPrevio !== "null" && seguroPrevio !== "undefined" && seguroPrevio !== "Seguro por confirmar") {
+      const padronPrevio = crearPadronDesdeSeguroExistente(numDni, seguroPrevio);
+      try { localStorage.setItem("padron_susalud_" + numDni, JSON.stringify(padronPrevio)); } catch(e){}
+      console.log(`📁 Padrón SUSALUD recuperado del historial médico previo (${seguroPrevio}) para DNI ${numDni}:`, padronPrevio);
+      return padronPrevio;
+    }
+    if (typeof buscarPacienteMaster === "function") {
+      const pacMaster = buscarPacienteMaster(numDni);
+      if (pacMaster && pacMaster.tipo_seguro && pacMaster.tipo_seguro !== "Seguro por confirmar") {
+        const padronPrevio = crearPadronDesdeSeguroExistente(numDni, pacMaster.tipo_seguro);
+        try { localStorage.setItem("padron_susalud_" + numDni, JSON.stringify(padronPrevio)); } catch(e){}
+        return padronPrevio;
+      }
+    }
+  } catch(e) {}
+
+  // Consulta en Supabase historias_clinicas
+  if (SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/historias_clinicas?or=(identificador.eq.${encodeURIComponent(numDni)},identificador.ilike.*${encodeURIComponent(numDni)}*)&select=padron_susalud,tipo_seguro&order=id.desc&limit=1`, {
+        headers: { "apikey": SUPABASE_CONFIG.key, "Authorization": `Bearer ${SUPABASE_CONFIG.key}` }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0 && rows[0].padron_susalud) {
+          const obj = typeof rows[0].padron_susalud === "string" ? JSON.parse(rows[0].padron_susalud) : rows[0].padron_susalud;
+          if (obj && obj.publico && obj.privado) {
+            obj.origen_registro = "BD_HISTORICA";
+            try { localStorage.setItem("padron_susalud_" + numDni, JSON.stringify(obj)); } catch(e){}
+            console.log(`☁️ Padrón SUSALUD cargado desde Supabase para DNI ${numDni}:`, obj);
+            return obj;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Aviso: Supabase padron lookup:", e.message);
+    }
+  }
+
+  // PASO 2: Si el DNI NO EXISTE en BD -> Generar una ÚNICA VEZ y guardar permanentemente
+  const nuevoPadron = await fetch_padron_susalud_siteds(numDni);
+  nuevoPadron.origen_registro = "NUEVA_CONSULTA";
+
+  // Guardar en localStorage
+  try {
+    localStorage.setItem("padron_susalud_" + numDni, JSON.stringify(nuevoPadron));
+    // Guardar también en seguro_asignado para persistencia histórica
+    const seguroTexto = nuevoPadron.tipo_aseguramiento === "SOLO_SIS" ? "SIS" :
+                        nuevoPadron.tipo_aseguramiento === "SOLO_ESSALUD" ? "EsSalud" :
+                        nuevoPadron.tipo_aseguramiento === "EPS_Y_ESSALUD" ? (nuevoPadron.privado.iafas_eps || "Pacífico EPS") :
+                        nuevoPadron.tipo_aseguramiento === "SOLO_PRIVADO" ? (nuevoPadron.privado.iafas_eps || "Seguro Privado") : "Sin Seguro";
+    localStorage.setItem("seguro_asignado_" + numDni, seguroTexto);
+  } catch (e) {}
+
+  // Guardar en Supabase (si está configurado)
+  if (SUPABASE_CONFIG.url && SUPABASE_CONFIG.key) {
+    try {
+      fetch(`${SUPABASE_CONFIG.url}/rest/v1/historias_clinicas?or=(identificador.eq.${encodeURIComponent(numDni)},identificador.ilike.*${encodeURIComponent(numDni)}*)`, {
+        method: "PATCH",
+        headers: {
+          "apikey": SUPABASE_CONFIG.key,
+          "Authorization": `Bearer ${SUPABASE_CONFIG.key}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ padron_susalud: nuevoPadron })
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
+  console.log(`✨ Nuevo Padrón SUSALUD generado y guardado permanentemente para DNI ${numDni}:`, nuevoPadron);
+  return nuevoPadron;
+}
+
+// ------------------------------------------------------------------------------
+// SINCRONIZADOR CENTRALIZADO DE PADRÓN SUSALUD EN TODA LA APLICACIÓN
+// ------------------------------------------------------------------------------
+async function sincronizarPadronSusalud(dni) {
+  if (!dni || String(dni).toUpperCase().startsWith("NN") || STATE.esNN) {
+    STATE.padronSusalud = null;
+    renderizarBadgesPadronSusalud(null);
+    return null;
+  }
+
+  const padron = await obtenerOGenerarPadronSusalud(dni);
+  STATE.padronSusalud = padron;
+
+  if (padron) {
+    // Si el padrón trajo marca de accidente en fuga y no se había marcado manualmente
+    if (padron.condicion_evento === "ACCIDENTE_TRANSITO_FUGA") {
+      STATE.eventoFugaTransversal = true;
+      const chkFuga = document.getElementById("chk_evento_fuga");
+      if (chkFuga) chkFuga.checked = true;
+    }
+
+    // Sincronizar STATE.tipoSeguro con el padrón recuperado/generado
+    const seguroTexto = padron.tipo_aseguramiento === "SOLO_SIS" ? "SIS" :
+                        padron.tipo_aseguramiento === "SOLO_ESSALUD" ? "EsSalud" :
+                        padron.tipo_aseguramiento === "EPS_Y_ESSALUD" ? (padron.privado.iafas_eps || "Pacífico EPS") :
+                        padron.tipo_aseguramiento === "SOLO_PRIVADO" ? (padron.privado.iafas_eps || "Seguro Privado") : "Sin Seguro";
+    STATE.tipoSeguro = seguroTexto;
+    if (typeof aplicarSeleccionSeguroYEntorno === "function") {
+      aplicarSeleccionSeguroYEntorno(seguroTexto, false, true);
+    }
+
+    renderizarBadgesPadronSusalud(padron);
+    actualizarVistaSegunEntornoOperativo();
+    renderizarBoxAcreditacionSusalud(padron);
+  }
+
+  actualizarFactura();
+  return padron;
+}
+
+// ------------------------------------------------------------------------------
+// RENDERIZADO DE BADGES DE PERSISTENCIA SUSALUD
+// ------------------------------------------------------------------------------
+function renderizarBadgesPadronSusalud(padron) {
+  const badgePersist = document.getElementById("badge_susalud_persistencia");
+  const badgeFactura = document.getElementById("badge_susalud_factura");
+  const badgeM3 = document.getElementById("pide_badge_bloqueo");
+
+  if (!padron) {
+    if (badgePersist) badgePersist.style.display = "none";
+    if (badgeFactura) {
+      badgeFactura.textContent = "—";
+      badgeFactura.style.background = "#f1f5f9";
+      badgeFactura.style.color = "#64748b";
+    }
+    return;
+  }
+
+  const esHistorico = (padron.origen_registro === "BD_HISTORICA");
+  const badgeText = esHistorico ? "[BD HISTÓRICA: PERFIL SUSALUD RECUPERADO]" : "[NUEVA CONSULTA API -> GUARDADO EN BD]";
+  const bg = esHistorico ? "#dbeafe" : "#dcfce7";
+  const color = esHistorico ? "#1e40af" : "#166534";
+  const border = esHistorico ? "1.5px solid #93c5fd" : "1.5px solid #86efac";
+
+  if (badgePersist) {
+    badgePersist.style.display = "inline-flex";
+    badgePersist.textContent = badgeText;
+    badgePersist.style.background = bg;
+    badgePersist.style.color = color;
+    badgePersist.style.border = border;
+  }
+
+  if (badgeFactura) {
+    badgeFactura.style.display = "inline-flex";
+    badgeFactura.textContent = badgeText;
+    badgeFactura.style.background = bg;
+    badgeFactura.style.color = color;
+    badgeFactura.style.border = border;
+  }
+
+  if (badgeM3) {
+    badgeM3.textContent = esHistorico ? "🔒 BD HISTÓRICA: PERFIL SUSALUD RECUPERADO" : "✨ NUEVA CONSULTA API -> GUARDADO EN BD";
+    badgeM3.style.background = bg;
+    badgeM3.style.color = color;
+  }
+}
+
+// ------------------------------------------------------------------------------
+// BIFURCACIÓN DE ENTORNO OPERATIVO ([Modo Público] vs [Modo Privado])
+// ------------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// VISIBILIDAD DE ENTORNO ASISTENCIAL (MODO PÚBLICO VS MODO PRIVADO)
+// En Privado: Únicamente Clínica Privada (EPS) y Sin Seguro (Particular)
+// En Público: Hospital MINSA, Hospital EsSalud y Sin Seguro
+// ---------------------------------------------------------------------------
+function actualizarVisibilidadBotonesEntorno() {
+  const modo = STATE.entornoOperativo || "publico";
+  const btnMinsa = document.getElementById("btn_entorno_minsa");
+  const btnEssalud = document.getElementById("btn_entorno_essalud");
+  const btnCli = document.getElementById("btn_entorno_clinica_eps");
+  const btnPart = document.getElementById("btn_entorno_particular");
+
+  if (modo === "privado") {
+    // EN PESTAÑA PRIVADA: SOLO DEBE APARECER EPS Y SIN SEGURO
+    if (btnMinsa) btnMinsa.style.setProperty("display", "none", "important");
+    if (btnEssalud) btnEssalud.style.setProperty("display", "none", "important");
+    if (btnCli) btnCli.style.setProperty("display", "flex", "important");
+    if (btnPart) btnPart.style.setProperty("display", "flex", "important");
+  } else {
+    // EN PESTAÑA PÚBLICA: MINSA, EsSalud y Sin seguro
+    if (btnMinsa) btnMinsa.style.setProperty("display", "flex", "important");
+    if (btnEssalud) btnEssalud.style.setProperty("display", "flex", "important");
+    if (btnCli) btnCli.style.setProperty("display", "none", "important");
+    if (btnPart) btnPart.style.setProperty("display", "flex", "important");
+  }
+}
+window.actualizarVisibilidadBotonesEntorno = actualizarVisibilidadBotonesEntorno;
+
+function cambiarEntornoOperativo(modo) {
+  const modoAnterior = STATE.entornoOperativo || "publico";
+  const nuevoModo = (modo === "privado") ? "privado" : "publico";
+  const debeBorrarAvance = (nuevoModo === "privado" && (modoAnterior === "publico" || STATE.numDni || STATE.identificador || (document.getElementById("dni_mod1")?.value) || (document.getElementById("ident_full")?.value)));
+
+  STATE.entornoOperativo = nuevoModo;
+  STATE.esClinicaPrivada = (nuevoModo === "privado");
+
+  if (debeBorrarAvance) {
+    // Requerimiento: Si ya estoy ingresando los datos en SIS o ESSALUD, al cambiar de pestaña a Privado se borra el avance
+    if (typeof limpiarFormularioCompletoState === "function") {
+      limpiarFormularioCompletoState();
+    }
+    STATE.entornoOperativo = "privado";
+    STATE.esClinicaPrivada = true;
+    STATE.tipoSeguro = "Particular";
+    STATE.planPrivado = "base_80_20";
+
+    const cie10 = document.getElementById("cie10_select");
+    if (cie10) cie10.selectedIndex = 0;
+    const dxPres = document.getElementById("dx_presuntivo");
+    if (dxPres) dxPres.value = "";
+    const recFarm = document.getElementById("select_receta_farmacia");
+    if (recFarm) recFarm.selectedIndex = 0;
+    const indMed = document.getElementById("indicaciones_medicas");
+    if (indMed) indMed.value = "";
+
+    if (typeof window.actualizarFichaClinicaEnTiempoReal === "function") {
+      try { window.actualizarFichaClinicaEnTiempoReal(); } catch(e){}
+    }
+    if (typeof window.actualizarFlujoSidebarEnTiempoReal === "function") {
+      try { window.actualizarFlujoSidebarEnTiempoReal(); } catch(e){}
+    }
+    if (typeof window.renderizarBandejaPosta === "function") {
+      try { window.renderizarBandejaPosta(); } catch(e){}
+    }
+    if (typeof window.actualizarCamasMonitorEnTiempoReal === "function") {
+      try { window.actualizarCamasMonitorEnTiempoReal(); } catch(e){}
+    }
+    if (typeof mostrarToastCola === "function") {
+      mostrarToastCola("🔄 <strong>Entorno Privado:</strong> Se ha borrado el avance anterior para iniciar un ingreso limpio en sector privado.");
+    }
+  } else {
+    // Bloque 6: Persistencia del seguro SITEDS por DNI al alternar modo Público y Privado
+    const dniAct = STATE.numDni || (document.getElementById("dni_reniec_input")?.value) || (document.getElementById("dni_mod1")?.value) || "";
+    STATE.segurosSitedsPorDni = STATE.segurosSitedsPorDni || {};
+    if (dniAct) {
+      if (nuevoModo === "publico" && STATE.planPrivado) {
+        STATE.segurosSitedsPorDni[dniAct] = {
+          planPrivado: STATE.planPrivado,
+          tipoSeguro: STATE.tipoSeguro,
+          padronPrivado: STATE.padronSusalud?.privado ? JSON.parse(JSON.stringify(STATE.padronSusalud.privado)) : null
+        };
+      } else if (nuevoModo === "privado" && STATE.segurosSitedsPorDni[dniAct]) {
+        const guardado = STATE.segurosSitedsPorDni[dniAct];
+        if (guardado.planPrivado) {
+          STATE.planPrivado = guardado.planPrivado;
+          const selPlan = document.getElementById("select_plan_privado");
+          if (selPlan) selPlan.value = guardado.planPrivado;
+        }
+        if (guardado.tipoSeguro && guardado.tipoSeguro !== "Particular") {
+          STATE.tipoSeguro = guardado.tipoSeguro;
+        }
+        if (guardado.padronPrivado && STATE.padronSusalud) {
+          STATE.padronSusalud.privado = guardado.padronPrivado;
+        }
+      }
+    }
+  }
+
+  // Actualizar estilos de los botones del selector
+  const btnPub = document.getElementById("tab_entorno_publico");
+  const btnPriv = document.getElementById("tab_entorno_privado");
+  const txtBanner = document.getElementById("entorno_sector_info_texto");
+  const badgeSector = document.getElementById("badge_sector_factura");
+
+  if (nuevoModo === "publico") {
+    if (btnPub) {
+      btnPub.classList.add("active");
+      btnPub.style.border = "2.5px solid #0284c7";
+      btnPub.style.background = "#eff6ff";
+      btnPub.style.color = "#0369a1";
+      btnPub.style.boxShadow = "0 2px 6px rgba(2,132,199,0.18)";
+    }
+    if (btnPriv) {
+      btnPriv.classList.remove("active");
+      btnPriv.style.border = "2px solid #e2e8f0";
+      btnPriv.style.background = "#f8fafc";
+      btnPriv.style.color = "#64748b";
+      btnPriv.style.boxShadow = "none";
+    }
+    if (txtBanner) {
+      txtBanner.innerHTML = "<strong>Regla Sectorial Activa:</strong> Afiliados SIS y EsSalud gozan de cobertura al 100% (Pago S/ 0.00). Pacientes particulares o con seguro privado puro pagan 100%.";
+    }
+    if (badgeSector) {
+      badgeSector.textContent = "Sector: Modo Público (MINSA / SIS / EsSalud)";
+      badgeSector.style.background = "#eff6ff";
+      badgeSector.style.color = "#1d4ed8";
+      badgeSector.style.border = "1px solid #bfdbfe";
+    }
+  } else {
+    if (btnPriv) {
+      btnPriv.classList.add("active");
+      btnPriv.style.border = "2.5px solid #7c3aed";
+      btnPriv.style.background = "#f5f3ff";
+      btnPriv.style.color = "#6d28d9";
+      btnPriv.style.boxShadow = "0 2px 6px rgba(124,58,237,0.18)";
+    }
+    if (btnPub) {
+      btnPub.classList.remove("active");
+      btnPub.style.border = "2px solid #e2e8f0";
+      btnPub.style.background = "#f8fafc";
+      btnPub.style.color = "#64748b";
+      btnPub.style.boxShadow = "none";
+    }
+    if (txtBanner) {
+      txtBanner.innerHTML = "<strong>Regla Sectorial Activa:</strong> Afiliados EPS con póliza activa cubiertos según copago y coaseguro (o 100% en P-I/II Ley N° 27604). Afiliados SIS o Solo EsSalud pagan 100% como particulares.";
+    }
+    if (badgeSector) {
+      badgeSector.textContent = "Sector: Modo Privado (Clínica / EPS / SITEDS)";
+      badgeSector.style.background = "#f5f3ff";
+      badgeSector.style.color = "#6d28d9";
+      badgeSector.style.border = "1px solid #ddd6fe";
+    }
+  }
+
+  // Alternar sub-selectores según entorno
+  const boxIpress = document.getElementById("subselector_ipress_publica");
+  const boxPlanPriv = document.getElementById("subselector_plan_privado");
+  if (nuevoModo === "publico") {
+    if (boxIpress) boxIpress.style.display = "flex";
+    if (boxPlanPriv) boxPlanPriv.style.display = "none";
+  } else {
+    if (boxIpress) boxIpress.style.display = "none";
+    if (boxPlanPriv) boxPlanPriv.style.display = "flex";
+  }
+
+  actualizarVisibilidadBotonesEntorno();
+  actualizarVistaSegunEntornoOperativo();
+  actualizarFactura();
+
+  if (typeof recalcularPrioridad === "function") {
+    try { recalcularPrioridad(); } catch(e){}
+  }
+
+  mostrarToastCola(`⚙️ <strong>Entorno Operativo:</strong> Cambiado a ${nuevoModo === 'publico' ? '🏛️ Modo Público (MINSA/SIS/EsSalud)' : '🏥 Modo Privado (Clínica/EPS/SITEDS)'}.`);
+}
+
+function toggleCondicionFugaTransversal(chk) {
+  STATE.eventoFugaTransversal = chk;
+  STATE.soatVehiculoFuga = chk;
+  if (chk) {
+    STATE.esAccidenteTransito = true;
+    STATE.tipoOrigenEvento = "soat";
+  }
+
+  const rbFuga = document.getElementById("rb_soat_fuga");
+  const rbIdent = document.getElementById("rb_soat_identificado");
+  if (rbFuga) rbFuga.checked = chk;
+  if (rbIdent) rbIdent.checked = !chk;
+
+  const boxFugaAlert = document.getElementById("box_soat_fuga_alert");
+  const boxCampos = document.getElementById("box_soat_campos");
+  const meterCard = document.getElementById("soat_meter_card");
+  if (boxFugaAlert) boxFugaAlert.style.display = chk ? "block" : "none";
+  if (boxCampos) boxCampos.style.display = chk ? "none" : "grid";
+  if (meterCard) meterCard.style.display = chk ? "none" : "block";
+
+  if (STATE.padronSusalud) {
+    STATE.padronSusalud.condicion_evento = chk ? "ACCIDENTE_TRANSITO_FUGA" : "NORMAL";
+  }
+
+  actualizarFactura();
+  mostrarToastCola(chk
+    ? "🚨 <strong>Accidente en Fuga:</strong> Sin SOAT identificable. Ningún seguro (SIS, EsSalud, Privado) cubre; paciente asume el 100%."
+    : "ℹ️ <strong>Régimen Normal:</strong> Accidente en Fuga desmarcado."
+  );
+}
+
+function actualizarVistaSegunEntornoOperativo() {
+  actualizarVisibilidadBotonesEntorno();
+  const modo = STATE.entornoOperativo || "publico";
+  const padron = STATE.padronSusalud;
+
+  if (!padron) return;
+
+  if (modo === "publico") {
+    if (padron.publico && padron.publico.estado === "ACTIVO") {
+      STATE.tipoSeguro = padron.publico.entidad === "SIS" ? "SIS" : "EsSalud";
+    } else {
+      STATE.tipoSeguro = "Particular";
+    }
+  } else {
+    if (padron.privado && padron.privado.estado_poliza === "ACTIVA") {
+      STATE.tipoSeguro = padron.privado.iafas_eps;
+    } else {
+      STATE.tipoSeguro = "Particular";
+    }
+  }
+
+  // Refrescar en Módulo 3 si está desplegado
+  renderizarBoxAcreditacionSusalud(padron);
+}
+
+// ------------------------------------------------------------------------------
+// RENDERIZADO DEL CUADRO DE ACREDITACIÓN EN MÓDULO 3
+// ------------------------------------------------------------------------------
+function renderizarBoxAcreditacionSusalud(padron) {
+  const box = document.getElementById("pide_acreditacion_box");
+  const grid = document.getElementById("pide_detalles_grid");
+  const titulo = document.getElementById("pide_tipo_titulo");
+  const badgeEstado = document.getElementById("pide_badge_estado");
+  const bannerCondicion = document.getElementById("pide_condiciones_cobro_banner");
+
+  if (!box || !padron) return;
+  box.style.display = "block";
+
+  const modo = STATE.entornoOperativo || "publico";
+
+  if (modo === "publico") {
+    const pub = padron.publico;
+    const esActivo = pub.estado === "ACTIVO";
+
+    if (titulo) {
+      titulo.textContent = esActivo
+        ? `🏛️ ACREDITACIÓN PÚBLICA: ${pub.entidad} (${pub.regimen})`
+        : "🏛️ SECTOR PÚBLICO: SIN COBERTURA ESTATAL (PARTICULAR)";
+    }
+    if (badgeEstado) {
+      badgeEstado.textContent = esActivo ? "✅ AFILIADO ACTIVO EN ESTADO" : "⚠️ NO ACREDITADO (PARTICULAR)";
+      badgeEstado.style.background = esActivo ? "#16a34a" : "#dc2626";
+    }
+
+    if (grid) {
+      grid.innerHTML = `
+        <div><span style="color:#64748b;">DNI Titular:</span><br><strong>${padron.dni}</strong></div>
+        <div><span style="color:#64748b;">Entidad Pública:</span><br><strong>${pub.entidad}</strong></div>
+        <div><span style="color:#64748b;">Régimen Estatal:</span><br><strong>${pub.regimen}</strong></div>
+        <div><span style="color:#64748b;">Código Prestacional:</span><br><strong style="font-family:monospace;color:#0284c7;">${pub.codigo || 'NO APLICA'}</strong></div>
+        <div><span style="color:#64748b;">Póliza Privada Vinculada:</span><br><strong>${padron.privado.iafas_eps}</strong></div>
+        <div><span style="color:#64748b;">Cobertura en Sector Público:</span><br><strong style="color:${esActivo ? '#16a34a' : '#dc2626'};">${esActivo ? '100% Gratuito (Pago S/ 0.00)' : '0% (Tarifa Particular 100%)'}</strong></div>
+      `;
+    }
+
+    if (bannerCondicion) {
+      bannerCondicion.style.borderLeftColor = esActivo ? "#16a34a" : "#dc2626";
+      bannerCondicion.innerHTML = esActivo
+        ? `<strong style="color:#15803d;display:block;margin-bottom:4px;">⚖️ REGLA PÚBLICA APLICADA (LEY N° 27604 - AUS):</strong> Paciente con derecho integral vigente en ${pub.entidad}. Todos los servicios médicos de emergencia, cama, exámenes y medicamentos están financiados al 100% por el Estado peruano (S/. 0.00 a pagar).`
+        : `<strong style="color:#b91c1c;display:block;margin-bottom:4px;">⚠️ ATENCIÓN PARTICULAR EN HOSPITAL PÚBLICO:</strong> El paciente no registra afiliación en SIS ni EsSalud. Asume el 100% de la liquidación monetaria.`;
+    }
+  } else {
+    // MODO PRIVADO
+    const priv = padron.privado;
+    const esActivo = priv.estado_poliza === "ACTIVA";
+
+    if (titulo) {
+      titulo.textContent = esActivo
+        ? `🏥 SITEDS ACREDITACIÓN PRIVADA: ${priv.iafas_eps} (${priv.plan_salud})`
+        : "🏥 CLÍNICA PRIVADA: SIN COBERTURA EPS (PACIENTE PARTICULAR)";
+    }
+    if (badgeEstado) {
+      badgeEstado.textContent = esActivo ? "✅ PÓLIZA EPS ACTIVA (SITEDS)" : "⚠️ PÓLIZA INACTIVA / PARTICULAR";
+      badgeEstado.style.background = esActivo ? "#7c3aed" : "#ea580c";
+    }
+
+    const exclusionesStr = priv.exclusiones && priv.exclusiones.length > 0 ? priv.exclusiones.join(", ") : "Ninguna (Póliza Plena)";
+
+    if (grid) {
+      grid.innerHTML = `
+        <div><span style="color:#64748b;">DNI Titular:</span><br><strong>${padron.dni}</strong></div>
+        <div><span style="color:#64748b;">IAFAS Privada:</span><br><strong>${priv.iafas_eps}</strong></div>
+        <div><span style="color:#64748b;">Plan de Salud:</span><br><strong>${priv.plan_salud || 'Particular'}</strong></div>
+        <div><span style="color:#64748b;">Código SITEDS:</span><br><strong style="font-family:monospace;color:#7c3aed;">${priv.siteds_codigo || 'SIN CÓDIGO'}</strong></div>
+        <div><span style="color:#64748b;">Copago Fijo / Coaseguro:</span><br><strong>S/. ${priv.copago_fijo ? priv.copago_fijo.toFixed(2) : '0.00'} | ${(priv.coaseguro_pct * 100).toFixed(0)}%</strong></div>
+        <div><span style="color:#64748b;">Exclusiones Contractuales:</span><br><strong style="color:${priv.exclusiones?.length ? '#b91c1c' : '#16a34a'};">${exclusionesStr}</strong></div>
+      `;
+    }
+
+    if (bannerCondicion) {
+      bannerCondicion.style.borderLeftColor = esActivo ? "#7c3aed" : "#ea580c";
+      bannerCondicion.innerHTML = esActivo
+        ? `<strong style="color:#6d28d9;display:block;margin-bottom:4px;">⚖️ REGLA PRIVADA APLICADA (SITEDS - EPS):</strong> En Prioridad I y II (Emergencia Vital), la aseguradora cubre el 100% (Pago S/ 0.00). En Prioridades III, IV y V, el paciente asume copago fijo de S/. ${priv.copago_fijo.toFixed(2)} + ${(priv.coaseguro_pct*100).toFixed(0)}% de coaseguro.`
+        : `<strong style="color:#c2410c;display:block;margin-bottom:4px;">🚨 ALERTA CLÍNICA PRIVADA:</strong> Paciente registra [${padron.publico.entidad || 'Sin Seguro'}] -> No aplica cobertura en Clínica Privada. Todo servicio se factura como Particular 100%.`;
+    }
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// ADMISIÓN RÁPIDA DE EMERGENCIA VIAL / SOAT (LEY N° 27181 & D.S. N° 024-2002-MTC)
+// ---------------------------------------------------------------------------
+function admitirEmergenciaSoat() {
+  cambiarOrigenEvento("soat");
+  STATE.ingresoDirectoCritico = true;
+  STATE.prioridad = "I";
+  STATE.colorPrioridad = "ROJO";
+  STATE.motivoIngresoCritico = "Protocolo de Emergencia Accidente de Tránsito / Trauma Vial Crítico (SOAT) — Ley N° 27181 & D.S. N° 024-2002-MTC";
+
+  // Si el Módulo 1 está colapsado, desplegarlo para ingreso inmediato de datos
+  const bodyM1 = document.getElementById("body_mod1");
+  if (bodyM1 && (bodyM1.style.display === "none" || !bodyM1.classList.contains("visible"))) {
+    toggleModule("mod1");
+  }
+
+  // Scroll suave al Módulo 1
+  const secM1 = document.getElementById("sec_mod1");
+  if (secM1) {
+    secM1.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (typeof recalcularPrioridad === "function") {
+    try { recalcularPrioridad(); } catch(e){}
+  }
+  if (typeof actualizarFactura === "function") {
+    try { actualizarFactura(); } catch(e){}
+  }
+
+  mostrarToastCola("🚗 <strong>Protocolo SOAT de Emergencia Activado:</strong> Origen establecido como Accidente de Tránsito / Trauma Vial (Ley N° 27181 & D.S. N° 024-2002-MTC).");
+}
+
+window.admitirEmergenciaSoat = admitirEmergenciaSoat;
+
 window.fetch_padron_susalud_siteds = fetch_padron_susalud_siteds;
 window.obtenerOGenerarPadronSusalud = obtenerOGenerarPadronSusalud;
 window.sincronizarPadronSusalud = sincronizarPadronSusalud;
@@ -12414,8 +13006,8 @@ window.toggleVistaClinicaCaja = toggleVistaClinicaCaja;
 // ==============================================================================
 // GESTIÓN DE LLEGADAS SIMULTÁNEAS Y DESEMPATE CLÍNICO (NTS N° 042 & NTS N° 031)
 // ==============================================================================
-let esLlegadaSimultanea = false;
-let PACIENTES_DESEMPATE_TEMP = [];
+var esLlegadaSimultanea = false;
+var PACIENTES_DESEMPATE_TEMP = [];
 
 function obtenerResumenCamasDisponibles() {
   const resumen = {
