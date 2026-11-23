@@ -3069,6 +3069,7 @@
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <input type="range" id="eva_range" min="0" max="10" value="0" style="flex:1;" oninput="actualizarEVA(this.value); if(typeof recalcularPrioridad==='function') recalcularPrioridad();">
+              <span id="eva_label" style="font-weight:800; font-size:0.82rem; color:#0284c7; min-width:85px;">Sin dolor (0/10)</span>
               <input type="number" id="eva_full" min="0" max="10" value="0" style="width:50px; text-align:center;" class="input-full" oninput="actualizarEVA(this.value); if(typeof recalcularPrioridad==='function') recalcularPrioridad();">
             </div>
           </div>
@@ -3097,7 +3098,7 @@
                 </div>
               </div>
               <div style="max-width:320px;">
-                <input type="number" id="glucosa_full" class="input-full" placeholder="105" min="0" max="800" oninput="validarAlertaVitalEnVivo('glucosa', this.value); if(typeof recalcularPrioridad==='function') recalcularPrioridad();">
+                <input type="number" id="glucosa_full" data-card="card_glucosa" class="input-full" placeholder="105" min="0" max="800" oninput="validarAlertaVitalEnVivo('glucosa', this.value); if(typeof recalcularPrioridad==='function') recalcularPrioridad();">
               </div>
             </div>
 
@@ -5172,6 +5173,9 @@
 
           <!-- ALERTA DE RECHAZO O EXCLUSIÓN SI APLICA -->
           <div id="liq_alerta_sectorial" style="display:none; margin-top:10px; padding:10px 14px; border-radius:8px; font-size:0.8rem; font-weight:700;"></div>
+
+          <!-- CONTENEDOR DE 4 LÍNEAS CONTABLES JETBRAINS MONO AUDITADAS -->
+          <div id="liquidacion_detalle_box" style="margin-top:14px;"></div>
 
           <!-- CHECKLIST AUTOMÁTICO DE AUDITORÍA ANTI-GLOSAS (NTS N° 139-MINSA / SUSALUD) -->
           <div id="checklist_anti_glosas_box" style="margin-top:14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px;">

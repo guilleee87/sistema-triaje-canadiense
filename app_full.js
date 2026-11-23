@@ -2695,11 +2695,26 @@ async function consultarReniec() {
     sexoDetectado = "F";
   }
 
-  // 1. Actualizar STATE
+  // 1. Actualizar STATE (Garantizar salida de estado NN)
+  STATE.esNN = false;
+  STATE.esNNConsciente = false;
+  STATE.esNNInconsciente = false;
   STATE.numDni = ident;
   STATE.nombreReniec = nombreCompleto;
   STATE.identificador = `${nombreCompleto} (DNI ${ident})`;
   STATE.sexo = sexoDetectado;
+
+  // Derivar y asegurar edad demográfica
+  const inputEdad = document.getElementById("edad_full");
+  const inputFecha = document.getElementById("fecha_nac_full");
+  const demoReniec = (typeof generarDatosDemograficosCoherentes === "function")
+    ? generarDatosDemograficosCoherentes(ident, inputEdad?.value, inputFecha?.value)
+    : { edad: 35, fechaNacimiento: "1991-05-15", grupoSanguineo: "O+" };
+
+  if (inputEdad && (!inputEdad.value || inputEdad.value === "")) inputEdad.value = demoReniec.edad;
+  if (inputFecha && (!inputFecha.value || inputFecha.value === "")) inputFecha.value = demoReniec.fechaNacimiento;
+  STATE.edad = inputEdad && inputEdad.value ? parseInt(inputEdad.value, 10) : demoReniec.edad;
+  STATE.fechaNacimiento = inputFecha && inputFecha.value ? inputFecha.value : demoReniec.fechaNacimiento;
 
   // Asignar o recuperar Historia Clínica
   if (!STATE.historiaClinica || STATE.historiaClinica === "—") {
@@ -9435,8 +9450,10 @@ function guardarEstadoPacienteActivo() {
   p.stateSnapshot = JSON.parse(JSON.stringify(STATE));
   p.formSnapshot = capturarFormularioActual();
   p.prioridad = STATE.prioridad;
-  p.identificador = STATE.identificador || p.identificador;
-  p.nombre = STATE.nombreReniec || p.nombre;
+  const inputIdent = document.getElementById("ident_full");
+  const rawIdent = inputIdent ? inputIdent.value.trim() : "";
+  p.identificador = STATE.identificador || rawIdent || p.identificador;
+  p.nombre = STATE.nombreReniec || (rawIdent && !rawIdent.startsWith("Ticket") ? rawIdent : null) || p.nombre;
   p.dni = STATE.numDni || p.dni;
   p.motivo = STATE.motivoConsulta || p.motivo;
   p.camaId = STATE.camaAsignadaId;
@@ -10086,15 +10103,19 @@ function mostrarToastCola(htmlMsg) {
 }
 
 function registrarPacienteEnEspera() {
+  // 1. Guardar de forma segura el paciente que estaba activo previamente
   guardarEstadoPacienteActivo();
+
+  // 2. Generar ticket y registro único para el nuevo paciente en espera
   const num = contadorSecuencialPx++;
+  const ticketStr = `Ticket T-${String(num).padStart(3, '0')}`;
   const nombrePx = `Paciente #${num} (En Espera)`;
   const idPx = `PX-ESP-${num}-${Date.now().toString(36).slice(-4)}`;
 
   const nuevoPx = crearRegistroPaciente({
     numero: num,
     id: idPx,
-    identificador: `Ticket T-${String(num).padStart(3, '0')}`,
+    identificador: ticketStr,
     nombre: nombrePx,
     prioridad: null,
     estadoAtencion: "En Espera de Triaje",
@@ -10102,12 +10123,55 @@ function registrarPacienteEnEspera() {
   });
 
   esLlegadaSimultanea = false;
-  PACIENTES_COLA = [nuevoPx];
-  pacienteActivoId = nuevoPx.id;
-  cambiarPacienteActivo(nuevoPx.id);
 
+  // 3. Añadir a la cola persistente (NUNCA pisar ni vaciar a los pacientes existentes)
+  if (!Array.isArray(PACIENTES_COLA)) {
+    PACIENTES_COLA = [];
+  }
+  PACIENTES_COLA.push(nuevoPx);
+
+  // 4. Activar el nuevo paciente
+  pacienteActivoId = nuevoPx.id;
+  window.pacienteActivoId = nuevoPx.id;
+
+  // 5. Limpiar completamente el formulario y preparar campos para ingreso manual
+  limpiarFormularioCompletoState();
+  STATE.identificador = ticketStr;
+  STATE.nombreReniec = "";
+  STATE.numDni = "";
+  STATE.prioridad = null;
+  STATE.prioridadCTAS = null;
+  STATE.estadoFlujo = "PENDIENTE_TRIAJE";
+  STATE.historiaClinica = `HC-2026-${String(num).padStart(4, '0')}`;
+
+  const elIdent = document.getElementById("ident_full");
+  if (elIdent) elIdent.value = ticketStr;
+  const elDni = document.getElementById("dni_mod1");
+  if (elDni) { elDni.value = ""; elDni.focus(); }
+  const elDniReniec = document.getElementById("dni_reniec_input");
+  if (elDniReniec) elDniReniec.value = "";
+  const elMotivo = document.getElementById("motivo_full");
+  if (elMotivo) elMotivo.value = "";
+  const hcCode = document.getElementById("hc_code_display");
+  if (hcCode) hcCode.textContent = STATE.historiaClinica;
+  const hcBadge = document.getElementById("hc_badge_estado");
+  if (hcBadge) {
+    hcBadge.textContent = "Nuevo Ingreso";
+    hcBadge.className = "badge-estado";
+  }
+
+  if (typeof bloquearIdentificacionEnMod2 === "function") bloquearIdentificacionEnMod2(false);
+  window._identificacionOrigen = null;
+
+  // 6. Guardar snapshot inicial limpio del nuevo paciente
+  nuevoPx.stateSnapshot = JSON.parse(JSON.stringify(STATE));
+  nuevoPx.formSnapshot = capturarFormularioActual();
+
+  // 7. Renderizar panel lateral de la izquierda con todos los pacientes
   renderizarTableroColaPacientes();
-  mostrarToastCola(`👤 <strong>Llegada Registrada:</strong> ${nombrePx} ingresado a sala de espera.`);
+
+  if (typeof irAModulo === "function") irAModulo(1);
+  mostrarToastCola(`👤 <strong>Nuevo Paciente en Espera:</strong> ${ticketStr} registrado. Ingrese sus datos manualmente.`);
 }
 window.registrarPacienteEnEspera = registrarPacienteEnEspera;
 
@@ -12585,6 +12649,13 @@ window.toggleExclusionEps = toggleExclusionEps;
 // Override calcularLiquidacionSeguro with exact legal rules
 const orig_calcularLiquidacionSeguro = window.calcularLiquidacionSeguro;
 window.calcularLiquidacionSeguro = function() {
+  // Si la función canónica de liquidación ya calcula las 4 líneas contables oficiales, usarla prioritariamente
+  if (typeof orig_calcularLiquidacionSeguro === "function" && (STATE.esClinicaPrivada || !STATE.padronSusalud)) {
+    const liqCanonica = orig_calcularLiquidacionSeguro();
+    if (liqCanonica && Array.isArray(liqCanonica.lineasContables) && liqCanonica.lineasContables.length === 4) {
+      return liqCanonica;
+    }
+  }
   const entorno = STATE.entornoOperativo || "publico";
   const padron = STATE.padronSusalud;
   const esAccidente = STATE.esAccidenteTransito || STATE.tipoOrigenEvento === "soat";
@@ -14537,17 +14608,60 @@ function seleccionarDestinoPostTopico(ruta) {
 
   const lblBadge = document.getElementById("lbl_recurso_cama_estado");
 
+  // Identificar cama previa para liberación segura
+  const camaPrevia = STATE.camaAsignadaId || (STATE.camaAsignada && typeof normalizarIdCamaClinica === "function" ? normalizarIdCamaClinica(STATE.camaAsignada) : null);
+
   if (ruta === "alta_directa" || ruta === "alta") {
-    // 0 Camas físicas
+    // 0 Camas físicas: Liberar explícitamente cualquier cama asignada
+    if (camaPrevia && typeof RECURSOS_HOSPITALARIOS !== "undefined" && RECURSOS_HOSPITALARIOS[camaPrevia]) {
+      RECURSOS_HOSPITALARIOS[camaPrevia].estado = "disponible";
+      RECURSOS_HOSPITALARIOS[camaPrevia].paciente = null;
+    }
+    if (typeof RECURSOS_HOSPITALARIOS !== "undefined") {
+      for (const k in RECURSOS_HOSPITALARIOS) {
+        const r = RECURSOS_HOSPITALARIOS[k];
+        const pac = r ? r.paciente : null;
+        const esMismoPaciente = pac && (
+          pac.identificador === STATE.identificador ||
+          pac.nombre === STATE.nombreReniec ||
+          pac.nombre === STATE.identificador ||
+          (typeof pacienteActivoId !== "undefined" && (pac.id === pacienteActivoId || pac.pacienteId === pacienteActivoId)) ||
+          (STATE.identificador && typeof pac.nombre === "string" && pac.nombre.includes(STATE.identificador)) ||
+          (STATE.nombreReniec && typeof pac.nombre === "string" && pac.nombre.includes(STATE.nombreReniec))
+        );
+        if (esMismoPaciente || (camaPrevia && k === camaPrevia) || (STATE.camaAsignadaId && k === STATE.camaAsignadaId)) {
+          r.estado = "disponible";
+          r.paciente = null;
+        }
+      }
+    }
+    if (Array.isArray(window.PACIENTES_COLA)) {
+      window.PACIENTES_COLA.forEach(px => {
+        if (px.identificador === STATE.identificador || px.nombre === STATE.nombreReniec || (typeof pacienteActivoId !== "undefined" && px.id === pacienteActivoId)) {
+          px.estadoFlujo = "ALTA_CLINICA";
+          px.camaId = null;
+          px.camaAsignada = null;
+        }
+      });
+    }
+    STATE.estadoFlujo = "ALTA_CLINICA";
     STATE.camaAsignadaId = null;
-    STATE.camaAsignada = "Alta Médica Directa (0 camas)";
+    STATE.camaAsignada = null;
     if (lblBadge) {
       lblBadge.textContent = "Recurso asignado: 0 camas (Alta Ambulatoria)";
       lblBadge.style.background = "#dcfce7";
       lblBadge.style.color = "#15803d";
       lblBadge.style.borderColor = "#bbf7d0";
     }
+    if (typeof actualizarCamasMonitorEnTiempoReal === "function") {
+      actualizarCamasMonitorEnTiempoReal();
+    }
+    return;
   } else if (ruta === "observacion") {
+    if (camaPrevia && camaPrevia !== "OBS-01" && typeof RECURSOS_HOSPITALARIOS !== "undefined" && RECURSOS_HOSPITALARIOS[camaPrevia]) {
+      RECURSOS_HOSPITALARIOS[camaPrevia].estado = "disponible";
+      RECURSOS_HOSPITALARIOS[camaPrevia].paciente = null;
+    }
     STATE.camaAsignadaId = "OBS-01";
     STATE.camaAsignada = "Cama Observación 1 (OBS-01)";
     if (lblBadge) {

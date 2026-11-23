@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="app_full.js"></script>
+<script src="rbac_flujo.js"></script>
+<script src="ui_feedback.js"></script>
+<script src="redesign_cockpit.js"></script>
+</head>
+<body>
+<div id="out"></div>
+<script>
+window.addEventListener('load', function() {
+  try {
+    STATE.items_factura = [
+      { nombre: 'Ceftriaxona 1g EV', categoria: 'Farmacia', costo: 85 },
+      { nombre: 'TAC Abdominal con Contraste', categoria: 'Imágenes', costo: 450 }
+    ];
+    STATE.esClinicaPrivada = true;
+    STATE.tipoSeguro = 'Pacífico EPS';
+    STATE.planNivelEps = 'Base';
+    var res = calcularLiquidacionSeguro();
+    document.getElementById('out').textContent = JSON.stringify(res);
+  } catch(e) {
+    document.getElementById('out').textContent = 'ERROR: ' + e.message;
+  }
+});
+</script>
+</body>
+</html>
