@@ -70,7 +70,7 @@
       </div>
 
       <div id="cockpit_active_patients_wrapper" style="display:flex; flex-direction:column; gap:8px;">
-        <!-- Contenedor donde se aloja el Tablero de atención simultánea y cola -->
+        <!-- Contenedor donde se aloja el Tablero de Atención y cola de emergencias -->
       </div>
     `;
 
@@ -309,6 +309,15 @@
     const sec7 = document.getElementById("sec_mod7");
     const sec8 = document.getElementById("sec_mod8");
 
+    // Carrusel Slide de Pacientes en Espera Pre-Triaje (Door-to-Triage NTS N° 042-MINSA & CTAS)
+    let pretriageSlide = document.getElementById("cockpit_pretriage_queue_wrapper");
+    if (!pretriageSlide) {
+      pretriageSlide = document.createElement("div");
+      pretriageSlide.id = "cockpit_pretriage_queue_wrapper";
+      pretriageSlide.className = "pretriage-queue-wrapper";
+    }
+    phase1.appendChild(pretriageSlide);
+
     if (sec1) phase1.appendChild(sec1);
     if (sec2) phase1.appendChild(sec2);
     if (sec3) phase2.appendChild(sec3);
@@ -318,7 +327,7 @@
     if (sec7) phase3.appendChild(sec7);
     if (sec8) phase4.appendChild(sec8);
 
-    // Mover el Tablero de atención simultánea y cola de emergencias al sidebar izquierdo
+    // Mover el Tablero de Atención y cola de emergencias al sidebar izquierdo
     const activePanel = document.getElementById("activePatientsPanel");
     const queueWrapper = document.getElementById("cockpit_active_patients_wrapper");
     if (activePanel && queueWrapper) {
@@ -327,12 +336,10 @@
       activePanel.style.width = "100%";
     }
 
-    // Mover la bandeja de posta al área central de trabajo (debajo de las fases asistenciales) a ancho completo
+    // Eliminar la bandeja de posta clínica si existiese (reemplazada por Tablero de Atención y cola de emergencias)
     const bandejaPosta = document.getElementById("bandeja_posta_container");
     if (bandejaPosta) {
-      workspaceCenter.appendChild(bandejaPosta);
-      bandejaPosta.style.width = "100%";
-      bandejaPosta.style.display = "block";
+      bandejaPosta.remove();
     }
 
     // Ocultar main contenedor viejo
@@ -346,6 +353,9 @@
     // 1.9 Aplicar vista de rol inicial
     const rolActual = window.RBAC_FLUJO ? window.RBAC_FLUJO.obtenerRolActivo() : "AUDITOR";
     aplicarVistaYPermisosRol(rolActual);
+    if (typeof window.renderizarCarruselPreTriaje === "function") {
+      window.renderizarCarruselPreTriaje();
+    }
 
     // 1.10 Refrescar contexto periódicamente
     actualizarContextoCockpit();
@@ -932,9 +942,14 @@ function refrescarValoresMonitor() {
       }
 
       const monEsi = document.getElementById("mon_esi_level");
-      if (monEsi && state.prioridad) {
-        monEsi.textContent = `Nivel ${state.prioridad}`;
-        monEsi.style.color = state.prioridad === "I" ? "#EF4444" : state.prioridad === "II" ? "#F97316" : "#A7F3D0";
+      if (monEsi) {
+        if (state.prioridad) {
+          monEsi.textContent = `Nivel ${state.prioridad}`;
+          monEsi.style.color = state.prioridad === "I" ? "#EF4444" : state.prioridad === "II" ? "#F97316" : "#A7F3D0";
+        } else {
+          monEsi.textContent = "--";
+          monEsi.style.color = "#94a3b8";
+        }
       }
     }
 
@@ -954,10 +969,21 @@ function refrescarValoresMonitor() {
       const nombre = state.nombreReniec || state.identificador || (state.esNN ? "Paciente NN (Crítico)" : "Sin paciente seleccionado");
       pxNombre.textContent = nombre;
 
-      const prio = state.prioridad || "V";
       if (pxPrio) {
-        pxPrio.className = `ui-badge-pill ui-badge-p${prio.toLowerCase()}`;
-        pxPrio.textContent = `P-${prio} · ${prio === "I" ? "Emergencia Vital" : prio === "II" ? "Emergencia" : prio === "III" ? "Urgencia" : "No Urgente"}`;
+        if (state.prioridad) {
+          const prio = state.prioridad;
+          pxPrio.className = `ui-badge-pill ui-badge-p${prio.toLowerCase()}`;
+          pxPrio.style.background = "";
+          pxPrio.style.color = "";
+          pxPrio.style.border = "";
+          pxPrio.textContent = `P-${prio} · ${prio === "I" ? "Emergencia Vital" : prio === "II" ? "Emergencia" : prio === "III" ? "Urgencia" : prio === "IV" ? "Urgencia Menor" : "No Urgente"}`;
+        } else {
+          pxPrio.className = "ui-badge-pill";
+          pxPrio.textContent = "⏳ Sin Prioridad (Por evaluar)";
+          pxPrio.style.background = "#f1f5f9";
+          pxPrio.style.color = "#475569";
+          pxPrio.style.border = "1px solid #cbd5e1";
+        }
       }
 
       if (pxCama) {
@@ -1286,6 +1312,9 @@ function refrescarValoresMonitor() {
       }
       if (typeof window.renderizarTableroColaPacientes === "function") {
         window.renderizarTableroColaPacientes();
+      }
+      if (typeof window.renderizarCarruselPreTriaje === "function") {
+        window.renderizarCarruselPreTriaje();
       }
       if (typeof actualizarContextoCockpit === "function") {
         actualizarContextoCockpit();

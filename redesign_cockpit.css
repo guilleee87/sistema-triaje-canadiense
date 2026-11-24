@@ -256,22 +256,62 @@ input[type="number"],
   padding: 12px !important;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   width: 100% !important;
+  box-sizing: border-box !important;
 }
 
+/* Ocultar botones tácticos redundantes dentro del sidebar izquierdo para dejar espacio limpio al listado vertical */
+#cockpit_active_patients_wrapper .active-patients-btn-group {
+  display: none !important;
+}
+
+/* TABLERO VERTICAL HACIA ABAJO (Cero slide horizontal a derecha/izquierda) */
+#cockpit_active_patients_wrapper #activePatientsCardsList,
+#cockpit_active_patients_wrapper .active-patients-cards-wrapper,
 #cockpit_active_patients_wrapper .active-patients-cards-list {
-  max-height: calc(100vh - 360px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-right: 2px;
+  max-height: calc(100vh - 360px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important; /* Estricto flujo vertical hacia abajo */
+  gap: 8px !important;
+  padding: 4px 2px 8px 2px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  scroll-snap-type: none !important;
 }
 
-#cockpit_workspace_center #bandeja_posta_container {
+#cockpit_active_patients_wrapper .patient-queue-card {
   width: 100% !important;
-  margin-top: 16px !important;
-  border-radius: 12px;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  box-sizing: border-box !important;
+  scroll-snap-align: none !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+#cockpit_active_patients_wrapper .patient-queue-card:hover {
+  background: #f8fafc !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+#cockpit_active_patients_wrapper .patient-queue-card.active-card {
+  background: #f0f9ff !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25), 0 2px 6px rgba(2, 132, 199, 0.1) !important;
+}
+
+#bandeja_posta_container,
+.bandeja-posta-card,
+#cockpit_workspace_center #bandeja_posta_container {
+  display: none !important;
 }
 
 .cockpit-stepper-card {
@@ -1239,4 +1279,531 @@ html.dark label,
   .codigos-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ==========================================================================
+   CARRUSEL SLIDE PRE-TRIAJE (DOOR-TO-TRIAGE · NTS N° 042-MINSA & CTAS)
+   Ubicación: Inmediatamente antes del Módulo 1 (Triaje)
+   ========================================================================== */
+.pretriage-queue-wrapper {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pretriage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 12px;
+}
+
+.pretriage-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pretriage-icon {
+  font-size: 1.4rem;
+  background: #eff6ff;
+  color: #0284c7;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pretriage-main-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.pretriage-norma-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #bae6fd;
+}
+
+.pretriage-subtitle {
+  font-size: 0.76rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.pretriage-kpi-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pretriage-kpi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.pretriage-kpi-pill.kpi-count {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+
+.pretriage-kpi-pill .kpi-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0284c7;
+}
+
+.pretriage-kpi-pill.kpi-wait {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.pretriage-kpi-pill.kpi-wait.kpi-warning {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.pretriage-kpi-pill.kpi-wait.kpi-danger {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.pretriage-kpi-pill.kpi-target {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.pretriage-nav-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-slide-nav {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-slide-nav:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-pretriage-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #0284c7;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-pretriage-add:hover {
+  background: #0369a1;
+  border-color: #0369a1;
+}
+
+/* Track de Tarjetas en Slide (Fila horizontal con overflow-x) */
+.pretriage-cards-track {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding: 4px 2px 8px 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pretriage-cards-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.pretriage-cards-track::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.pretriage-cards-track::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.pretriage-cards-track::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Banner de Sala Despejada */
+.pretriage-empty-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #f8fafc;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 10px;
+  width: 100%;
+}
+
+.pretriage-empty-icon {
+  font-size: 1.4rem;
+}
+
+.pretriage-empty-info {
+  flex: 1;
+  font-size: 0.82rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.btn-pretriage-empty-add {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0284c7;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-pretriage-empty-add:hover {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+
+/* Tarjeta de Paciente en Cola Pre-Triaje */
+.pretriage-card {
+  min-width: 250px;
+  max-width: 270px;
+  flex: 0 0 auto;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  border-top-width: 4px !important;
+}
+
+.pretriage-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.pretriage-card.border-ok {
+  border-top-color: #0284c7 !important;
+}
+
+.pretriage-card.border-warning {
+  border-top-color: #f59e0b !important;
+}
+
+.pretriage-card.border-danger {
+  border-top-color: #ef4444 !important;
+}
+
+.pretriage-card.active-px {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+
+.pretriage-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pretriage-pos-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.pretriage-status-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.pretriage-status-pill.status-waiting {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pretriage-status-pill.status-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pretriage-ticket-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.pretriage-ticket-code {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pretriage-time-tag {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+.pretriage-name-sub {
+  font-size: 0.76rem;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.pretriage-timer-box {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  margin-top: 6px;
+  border: 1px solid transparent;
+}
+
+.pretriage-timer-box.timer-ok {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+
+.pretriage-timer-box.timer-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.pretriage-timer-box.timer-danger {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.pretriage-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.badge-vuln {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+}
+
+.badge-vuln.vuln-adulto {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.badge-vuln.vuln-gestante {
+  background: #fdf2f8;
+  color: #9d174d;
+  border-color: #fbcfe8;
+}
+
+.badge-vuln.vuln-pediatrico {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.badge-vuln.vuln-senior {
+  background: #faf5ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+
+.badge-vuln.vuln-nn {
+  background: #fff1f2;
+  color: #9f1239;
+  border-color: #fecdd3;
+}
+
+.badge-modalidad {
+  font-size: 0.68rem;
+  color: #64748b;
+  background: #f8fafc;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid #e2e8f0;
+}
+
+.pretriage-motivo-preview {
+  font-size: 0.72rem;
+  color: #475569;
+  background: #f8fafc;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+  margin-top: 6px;
+  line-height: 1.3;
+}
+
+.pretriage-motivo-preview .motivo-label {
+  font-weight: 700;
+  color: #334155;
+}
+
+.pretriage-btn-active {
+  width: 100%;
+  padding: 6px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.btn-pretriage-select {
+  width: 100%;
+  padding: 6px 10px;
+  background: #ffffff;
+  color: #0284c7;
+  border: 1.5px solid #0284c7;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-pretriage-select:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+/* Modo Oscuro Calm-Tech */
+body.dark-mode .pretriage-queue-wrapper {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .pretriage-header {
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .pretriage-main-title {
+  color: #f8fafc;
+}
+
+body.dark-mode .pretriage-subtitle {
+  color: #94a3b8;
+}
+
+body.dark-mode .pretriage-card {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .pretriage-card.active-px {
+  background: #0c4a6e;
+  border-color: #38bdf8;
+}
+
+body.dark-mode .pretriage-ticket-code {
+  color: #f8fafc;
+}
+
+body.dark-mode .pretriage-empty-banner {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+body.dark-mode .pretriage-empty-info {
+  color: #cbd5e1;
+}
+
+body.dark-mode .btn-slide-nav {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+body.dark-mode .btn-slide-nav:hover {
+  background: #1e293b;
+  color: #f8fafc;
 }

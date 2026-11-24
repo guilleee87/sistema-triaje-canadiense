@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ==============================================================================
  * SIMULADOR HIS COMPLETO — EMERGENCIA NIVEL III-1
  * Curso: Pensamiento Algorítmico - Ciclo II (Trabajo Parcial UPP)
@@ -5408,7 +5408,7 @@ function calcularLiquidacionSeguro() {
     return {
       regimen: "PUBLICO_SIS_FUA",
       entorno: "PUBLICO_FUA",
-      etiquetaRegimen: "MINSA · SIS Gratuito (Formato Único de Atención - FUA)",
+      etiquetaRegimen: `MINSA · SIS Gratuito (FUA: ${STATE.nroFua || "FUA-2026-PENDIENTE"})`,
       copagoFijo: 0,
       coaseguroPct: 0,
       totalBruto: totalBruto,
@@ -5430,7 +5430,7 @@ function calcularLiquidacionSeguro() {
     return {
       regimen: "PUBLICO_ESSALUD_ESSI",
       entorno: "PUBLICO_ESSI",
-      etiquetaRegimen: "EsSalud · Acreditación Regular Activa (ESSI / Sin Copago)",
+      etiquetaRegimen: `EsSalud · Acreditación Regular Activa (ESSI: ${STATE.nroEssi || "ESSI-2026-PENDIENTE"})`,
       copagoFijo: 0,
       coaseguroPct: 0,
       totalBruto: totalBruto,
@@ -5476,6 +5476,9 @@ function actualizarFactura() {
   const badgeNav = document.getElementById("navLiquidacionBadge");
   const badgeNavMonto = document.getElementById("navLiquidacionMonto");
 
+  if (typeof actualizarBotonesFormatoPublico === "function") {
+    actualizarBotonesFormatoPublico();
+  }
   if (totalEl) totalEl.textContent = liq.totalPaciente.toFixed(2);
   if (miniEl) miniEl.textContent = `S/. ${liq.totalPaciente.toFixed(2)}`;
   if (badgeNavMonto) badgeNavMonto.textContent = `S/. ${liq.totalPaciente.toFixed(2)}`;
@@ -5671,8 +5674,8 @@ function generarFacturaPDF() {
 
       <br><br>
       <div style="display:flex;justify-content:space-between;margin-top:30px;">
-        <div style="text-align:center;">_______________________<br><small>Firma del Paciente / Responsable</small></div>
-        <div style="text-align:center;">_______________________<br><small>Jefe de Caja y Facturación HIS</small></div>
+        <div style="text-align:center;">_______________________<br><small>Firma del Paciente / Responsable<br><span style="font-size:0.68rem; color:#64748b;">(En blanco — Sin firma digital RENIEC)</span></small></div>
+        <div style="text-align:center;">_______________________<br><small>Jefe de Caja y Facturación HIS<br><span style="font-size:0.68rem; color:#0369a1;">🔐 Firma Digital Simulada Personal de Salud (Ley N° 27269)</span></small></div>
       </div>
     </body></html>
   `;
@@ -5901,6 +5904,13 @@ function evaluarPacienteCompleto() {
   }
   // Recalcular liquidación de seguro según prioridad (Emergencia P1/P2 vs Urgencia P3/P4/P5)
   actualizarFactura();
+  const pxEvaluado = (PACIENTES_COLA || []).find(x => x.id === pacienteActivoId);
+  if (pxEvaluado) {
+    pxEvaluado.prioridad = STATE.prioridad;
+    pxEvaluado.triajeConcluido = true;
+  }
+  if (typeof renderizarCarruselPreTriaje === "function") renderizarCarruselPreTriaje();
+  if (typeof renderizarTableroColaPacientes === "function") renderizarTableroColaPacientes();
   alert(`✅ Evaluación de Triaje completada con éxito.\n\n• Prioridad Asignada: P-${STATE.prioridad} (${STATE.prioridad ? PRIORIDADES[STATE.prioridad].nombre : "—"})\n\n🏷️ La Pulsera / Brazalete de Identificación y Prioridad con código de color y alergias ya está lista para imprimir.`);
   setTimeout(() => {
     if (confirm(`🏷️ ¿Desea imprimir ahora la Pulsera / Brazalete Hospitalario con código de color MINSA y advertencia de alergias?`)) {
@@ -6628,6 +6638,18 @@ function irAModulo(num) {
   }
 
   moduloActivoActual = num;
+
+  if (num >= 2) {
+    const pxA = (PACIENTES_COLA || []).find(x => x.id === pacienteActivoId);
+    if (pxA && STATE.prioridad) {
+      pxA.prioridad = STATE.prioridad;
+      pxA.triajeConcluido = true;
+      if (pxA.estadoFlujo === "PENDIENTE_TRIAJE") {
+        pxA.estadoFlujo = (num === 2 || num === 3) ? "ADMISION" : "EN_ATENCION_MEDICA";
+      }
+    }
+    if (typeof renderizarCarruselPreTriaje === "function") renderizarCarruselPreTriaje();
+  }
 
   // Sincronizar automáticamente con fases de Cabina Cockpit
   if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
@@ -9060,8 +9082,8 @@ function imprimirEpicrisisReceta() {
         4. Signos de Alarma: Reconsultar de inmediato ante fiebre persistente, disnea o dolor intratable.
       </div>
       <div style="margin-top:40px;display:flex;justify-content:space-between;text-align:center;">
-        <div style="border-top:1px solid #000;width:220px;padding-top:4px;">Firma y Sello Médico Tratante<br>CMP / RNE</div>
-        <div style="border-top:1px solid #000;width:220px;padding-top:4px;">Firma del Paciente / Familiar<br>Conformidad de Alta</div>
+        <div style="border-top:1px solid #000;width:220px;padding-top:4px;">Firma y Sello Médico Tratante<br>CMP / RNE<br><span style="font-size:10px;color:#0369a1;">🔐 Firma Digital Simulada Personal de Salud</span></div>
+        <div style="border-top:1px solid #000;width:220px;padding-top:4px;">Firma del Paciente / Familiar<br><small style="color:#64748b;">(En blanco — Sin firma digital RENIEC)</small><br>Conformidad de Alta</div>
       </div>
     </body></html>
   `);
@@ -9112,8 +9134,8 @@ function imprimirActaAltaVoluntaria() {
       <p><strong>Constancia Médica:</strong> Se deja constancia de que el médico tratante ha informado detalladamente al paciente y sus familiares respecto a su estado clínico, el diagnóstico presuntivo (${STATE.cie10Codigo} - ${STATE.cie10Descripcion}) y los riesgos graves de complicaciones, secuelas permanentes o riesgo vital derivados de la interrupción del tratamiento hospitalario.</p>
       <p>El firmante exonera de toda responsabilidad penal, civil o administrativa al cuerpo médico, asistencial y directivo del establecimiento de salud.</p>
       <div style="margin-top:50px;display:flex;justify-content:space-between;text-align:center;">
-        <div style="border-top:1px solid #000;width:240px;padding-top:4px;">Firma / Huella del Paciente o Familiar<br>DNI N°:</div>
-        <div style="border-top:1px solid #000;width:240px;padding-top:4px;">Firma y Sello del Médico Tratante<br>CMP / RNE:</div>
+        <div style="border-top:1px solid #000;width:240px;padding-top:4px;">Firma / Huella del Paciente o Familiar<br><small style="color:#64748b;">(En blanco — Sin firma digital RENIEC)</small><br>DNI N°:</div>
+        <div style="border-top:1px solid #000;width:240px;padding-top:4px;">Firma y Sello del Médico Tratante<br>CMP / RNE:<br><span style="font-size:10px;color:#0369a1;">🔐 Firma Digital Simulada Personal de Salud</span></div>
       </div>
     </body></html>
   `);
@@ -9866,7 +9888,14 @@ function crearRegistroPaciente(datos = {}) {
   const horaStr = ahora.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const num = datos.numero || contadorSecuencialPx++;
   const id = datos.id || generarIdPaciente();
-  
+
+  // Asignacion aleatoria SIS (MINSA) vs EsSalud si no viene especificado
+  const esSis = (datos.tipoSeguro === "SIS" || (!datos.tipoSeguro && Math.random() < 0.5));
+  const tipoSeguroFinal = datos.tipoSeguro || (esSis ? "SIS" : "EsSalud");
+  const tipoIpressFinal = datos.tipoIpressPublica || (tipoSeguroFinal === "EsSalud" ? "ESSALUD" : "MINSA");
+  const nroFuaFinal = datos.nroFua || (tipoSeguroFinal === "SIS" ? `FUA-2026-${Math.floor(100000 + Math.random() * 900000)}` : "");
+  const nroEssiFinal = datos.nroEssi || (tipoSeguroFinal === "EsSalud" ? `ESSI-2026-${Math.floor(100000 + Math.random() * 900000)}` : "");
+
   return {
     id: id,
     numero: num,
@@ -9875,6 +9904,10 @@ function crearRegistroPaciente(datos = {}) {
     dni: datos.dni || "",
     edad: datos.edad || null,
     sexo: datos.sexo || "M",
+    tipoSeguro: tipoSeguroFinal,
+    tipoIpressPublica: tipoIpressFinal,
+    nroFua: nroFuaFinal,
+    nroEssi: nroEssiFinal,
     horaLlegada: datos.horaLlegada || horaStr,
     timestampLlegada: datos.timestampLlegada || ahora.getTime(),
     modalidad: datos.modalidad || "A pie",
@@ -9893,6 +9926,7 @@ function crearRegistroPaciente(datos = {}) {
     formSnapshot: datos.formSnapshot ? JSON.parse(JSON.stringify(datos.formSnapshot)) : null
   };
 }
+window.crearRegistroPaciente = crearRegistroPaciente;
 
 function capturarFormularioActual() {
   const inputs = {};
@@ -10068,6 +10102,304 @@ function limpiarFormularioCompletoState() {
 }
 window.limpiarFormularioCompletoState = limpiarFormularioCompletoState;
 
+// ===========================================================================
+// CARRUSEL SLIDE PRE-TRIAJE: PACIENTES EN ESPERA (DOOR-TO-TRIAGE CTAS & MINSA)
+// Ubicación normativa: Inmediatamente antes del Módulo 1 (Triaje)
+// Sustento: NTS N° 042-MINSA (Acceso y flujo oportuno), Ley N° 27408 (Atención
+// Preferente gestante/niños/ancianos) y CTAS Door-to-Triage (Meta <= 10-15 min)
+// ===========================================================================
+
+function esPacientePendienteDeTriaje(p) {
+  if (!p) return false;
+  if (p.terminoFlujo === true || p.altaClinicaConcluida === true) return false;
+  const ef = p.estadoFlujo || "";
+  if (ef === "CERRADO_FACTURADO" || ef === "ALTA_CLINICA" || ef === "ADMISION" || ef === "EN_ATENCION_MEDICA" || ef === "PENDIENTE_CAJA") return false;
+  const ea = p.estadoAtencion || "";
+  if (ea === "Atendido" || ea === "Alta" || ea === "Cerrado" || ea.includes("Alta")) return false;
+  if (p.triajeConcluido === true) return false;
+  if (p.prioridad && p.prioridad !== "" && ef !== "PENDIENTE_TRIAJE") return false;
+  return true;
+}
+
+function renderizarCarruselPreTriaje() {
+  const wrapper = document.getElementById("cockpit_pretriage_queue_wrapper");
+  if (!wrapper) return;
+
+  const pacientesPreTriaje = (Array.isArray(PACIENTES_COLA) ? PACIENTES_COLA : [])
+    .filter(p => esPacientePendienteDeTriaje(p))
+    .sort((a, b) => (a.timestampLlegada || 0) - (b.timestampLlegada || 0));
+
+  const total = pacientesPreTriaje.length;
+
+  let maxEsperaMs = 0;
+  const ahora = Date.now();
+  if (total > 0) {
+    pacientesPreTriaje.forEach(p => {
+      const diff = ahora - (p.timestampLlegada || ahora);
+      if (diff > maxEsperaMs) maxEsperaMs = diff;
+    });
+  }
+  const maxMinutos = Math.floor(maxEsperaMs / 60000);
+  const maxSegundos = Math.floor((maxEsperaMs % 60000) / 1000);
+  const maxEsperaStr = `${String(maxMinutos).padStart(2, '0')}:${String(maxSegundos).padStart(2, '0')}`;
+
+  let kpiSlaClass = "kpi-normal";
+  if (maxMinutos >= 15) {
+    kpiSlaClass = "kpi-danger";
+  } else if (maxMinutos >= 10) {
+    kpiSlaClass = "kpi-warning";
+  }
+
+  const headerHtml = `
+    <div class="pretriage-header">
+      <div class="pretriage-title-group">
+        <span class="pretriage-icon" aria-hidden="true">🩺</span>
+        <div>
+          <div class="pretriage-main-title">
+            <span>Cola de Espera Pre-Triaje</span>
+            <span class="pretriage-norma-tag" title="Sustento normativo de acceso rápido">NTS N° 042-MINSA · CTAS Door-to-Triage</span>
+          </div>
+          <div class="pretriage-subtitle">Pacientes en sala de espera antes del ingreso a Módulo 1 (Orden cronológico de llegada FIFO)</div>
+        </div>
+      </div>
+
+      <div class="pretriage-kpi-group">
+        <div class="pretriage-kpi-pill kpi-count" id="kpi_pretriage_count" title="Total de pacientes esperando evaluación inicial de triaje">
+          <span class="kpi-dot"></span>
+          <strong id="lbl_pretriage_total">${total}</strong> ${total === 1 ? 'en espera' : 'en espera'}
+        </div>
+        <div class="pretriage-kpi-pill kpi-wait ${kpiSlaClass}" id="kpi_pretriage_max_wait" title="Tiempo de espera más prolongado en sala">
+          ⏱️ Máx: <strong id="lbl_pretriage_max_wait">${maxEsperaStr} min</strong>
+        </div>
+        <div class="pretriage-kpi-pill kpi-target" title="Estándar Canadiense CTAS y MINSA: Clasificación inicial <= 10-15 minutos">
+          🎯 SLA: ≤ 10m
+        </div>
+        <div class="pretriage-nav-btns">
+          <button type="button" class="btn-slide-nav" onclick="deslizarCarruselPreTriaje('prev')" title="Deslizar pacientes anteriores" aria-label="Anterior">‹</button>
+          <button type="button" class="btn-slide-nav" onclick="deslizarCarruselPreTriaje('next')" title="Deslizar siguientes pacientes" aria-label="Siguiente">›</button>
+          <button type="button" class="btn-pretriage-add" onclick="registrarPacienteEnEspera()" title="Registrar nuevo paciente en sala de espera (+ Espera)">
+            ➕ + Espera
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let cardsHtml = "";
+  if (total === 0) {
+    cardsHtml = `
+      <div class="pretriage-empty-banner">
+        <div class="pretriage-empty-icon">🟢</div>
+        <div class="pretriage-empty-info">
+          <strong>Sala de Espera de Triaje Despejada:</strong> No hay pacientes en cola pendientes de evaluación inicial. Puerta de entrada con 100% de cumplimiento en tiempo de acceso.
+        </div>
+        <button type="button" class="btn-pretriage-empty-add" onclick="registrarPacienteEnEspera()">
+          ➕ Registrar Llegada (+ Espera)
+        </button>
+      </div>
+    `;
+  } else {
+    cardsHtml = pacientesPreTriaje.map((p, idx) => {
+      const esActivo = (p.id === pacienteActivoId);
+      const diffMs = ahora - (p.timestampLlegada || ahora);
+      const mins = Math.floor(diffMs / 60000);
+      const segs = Math.floor((diffMs % 60000) / 1000);
+      const tiempoStr = `${String(mins).padStart(2, '0')}:${String(segs).padStart(2, '0')}`;
+
+      let timerClass = "timer-ok";
+      let alertaDesc = "En tiempo";
+      let cardBorderClass = "border-ok";
+      if (mins >= 15) {
+        timerClass = "timer-danger";
+        alertaDesc = "Excede SLA";
+        cardBorderClass = "border-danger";
+      } else if (mins >= 10) {
+        timerClass = "timer-warning";
+        alertaDesc = "Alerta CTAS";
+        cardBorderClass = "border-warning";
+      }
+
+      let badgeVuln = `<span class="badge-vuln vuln-adulto" title="Adulto general">👤 Adulto</span>`;
+      const snap = p.stateSnapshot || {};
+      const edadVal = (p.edad !== null && p.edad !== undefined) ? p.edad : snap.edad;
+      const esGest = Boolean(p.esGestante || snap.esGestante || p.chk_gestante);
+      const esPed = Boolean(p.esPediatrico || snap.esPediatrico || (edadVal !== null && edadVal !== undefined && edadVal < 14));
+      const esSen = Boolean(edadVal !== null && edadVal !== undefined && edadVal >= 60);
+
+      if (esGest) {
+        badgeVuln = `<span class="badge-vuln vuln-gestante" title="Atención Preferente Ley N° 27408 / Claves Obstétricas MINSA">🤰 Gestante · Preferente</span>`;
+      } else if (esPed) {
+        const subPed = (edadVal !== null && edadVal <= 1) ? "Lactante" : "Pediátrico";
+        badgeVuln = `<span class="badge-vuln vuln-pediatrico" title="PaedCTAS - Algoritmo pediátrico canadiense">👶 ${subPed} (<14a)</span>`;
+      } else if (esSen) {
+        badgeVuln = `<span class="badge-vuln vuln-senior" title="Atención Preferente Ley N° 27408 (Adulto Mayor >= 60 años)">🧓 Adulto Mayor · Preferente</span>`;
+      } else if (p.esNN) {
+        badgeVuln = `<span class="badge-vuln vuln-nn" title="Paciente NN Indocumentado / Identificación OMS">👤 Paciente NN</span>`;
+      }
+
+      const mod = p.modalidad || "A pie";
+      let modIcon = "🚶";
+      if (mod.toLowerCase().includes("samu") || mod.toLowerCase().includes("ambulancia")) modIcon = "🚑";
+      else if (mod.toLowerCase().includes("silla")) modIcon = "🦽";
+      else if (mod.toLowerCase().includes("camilla")) modIcon = "🛏️";
+
+      const ticketText = p.identificador || `Ticket T-${String(p.numero || idx + 1).padStart(3, '0')}`;
+      const nombreText = (p.nombre && !p.nombre.includes("Paciente #")) ? p.nombre : "";
+
+      const motivoTexto = p.motivo || snap.motivo || "Sin queja registrada aún";
+      const motivoTruncado = motivoTexto.length > 38 ? (motivoTexto.substring(0, 35) + "...") : motivoTexto;
+
+      return `
+        <div class="pretriage-card ${esActivo ? 'active-px' : ''} ${cardBorderClass}" id="card_pretriage_${p.id}" onclick="seleccionarPacientePreTriaje('${p.id}')">
+          <div class="pretriage-card-header">
+            <span class="pretriage-pos-badge">#${idx + 1} en Fila</span>
+            <span class="pretriage-status-pill ${esActivo ? 'status-active' : 'status-waiting'}">
+              ${esActivo ? '🩺 Evaluando' : '⏳ En Espera'}
+            </span>
+          </div>
+
+          <div class="pretriage-card-body">
+            <div class="pretriage-ticket-row">
+              <span class="pretriage-ticket-code">${ticketText}</span>
+              <span class="pretriage-time-tag" title="Hora de registro de llegada">🕒 ${p.horaLlegada || '--:--'}</span>
+            </div>
+            ${nombreText ? `<div class="pretriage-name-sub" title="${p.nombre}">${p.nombre}</div>` : ''}
+
+            <div class="pretriage-timer-box ${timerClass}">
+              <span class="timer-clock-icon">⏱️</span>
+              <strong id="timer_pretriage_${p.id}" class="timer-clock-digits">${tiempoStr} min</strong>
+              <span class="timer-clock-desc">(${alertaDesc})</span>
+            </div>
+
+            <div class="pretriage-tags-row">
+              ${badgeVuln}
+              <span class="badge-modalidad" title="Modalidad de arribo">${modIcon} ${mod}</span>
+            </div>
+
+            <div class="pretriage-motivo-preview" title="${motivoTexto}">
+              <span class="motivo-label">Motivo:</span> <span class="motivo-text">${motivoTruncado}</span>
+            </div>
+          </div>
+
+          <div class="pretriage-card-footer">
+            ${esActivo 
+              ? `<div class="pretriage-btn-active">▶️ En Evaluación Actual</div>` 
+              : `<button type="button" class="btn-pretriage-select" onclick="event.stopPropagation(); seleccionarPacientePreTriaje('${p.id}')">
+                   📥 Iniciar Triaje
+                 </button>`
+            }
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  wrapper.innerHTML = `
+    ${headerHtml}
+    <div class="pretriage-cards-track" id="pretriage_cards_track">
+      ${cardsHtml}
+    </div>
+  `;
+}
+
+function actualizarCronometrosPreTriaje() {
+  const track = document.getElementById("pretriage_cards_track");
+  if (!track) return;
+
+  const pacientesPreTriaje = (Array.isArray(PACIENTES_COLA) ? PACIENTES_COLA : [])
+    .filter(p => esPacientePendienteDeTriaje(p));
+
+  const ahora = Date.now();
+  let maxEsperaMs = 0;
+
+  pacientesPreTriaje.forEach(p => {
+    const diff = ahora - (p.timestampLlegada || ahora);
+    if (diff > maxEsperaMs) maxEsperaMs = diff;
+
+    const elTimer = document.getElementById(`timer_pretriage_${p.id}`);
+    if (elTimer) {
+      const mins = Math.floor(diff / 60000);
+      const segs = Math.floor((diff % 60000) / 1000);
+      elTimer.textContent = `${String(mins).padStart(2, '0')}:${String(segs).padStart(2, '0')} min`;
+
+      const box = elTimer.closest(".pretriage-timer-box");
+      const card = document.getElementById(`card_pretriage_${p.id}`);
+      if (box) {
+        box.classList.remove("timer-ok", "timer-warning", "timer-danger");
+        if (card) card.classList.remove("border-ok", "border-warning", "border-danger");
+
+        const desc = box.querySelector(".timer-clock-desc");
+        if (mins >= 15) {
+          box.classList.add("timer-danger");
+          if (card) card.classList.add("border-danger");
+          if (desc) desc.textContent = "(Excede SLA)";
+        } else if (mins >= 10) {
+          box.classList.add("timer-warning");
+          if (card) card.classList.add("border-warning");
+          if (desc) desc.textContent = "(Alerta CTAS)";
+        } else {
+          box.classList.add("timer-ok");
+          if (card) card.classList.add("border-ok");
+          if (desc) desc.textContent = "(En tiempo)";
+        }
+      }
+    }
+  });
+
+  const lblMax = document.getElementById("lbl_pretriage_max_wait");
+  const kpiWait = document.getElementById("kpi_pretriage_max_wait");
+  if (lblMax && pacientesPreTriaje.length > 0) {
+    const maxMins = Math.floor(maxEsperaMs / 60000);
+    const maxSegs = Math.floor((maxEsperaMs % 60000) / 1000);
+    lblMax.textContent = `${String(maxMins).padStart(2, '0')}:${String(maxSegs).padStart(2, '0')} min`;
+
+    if (kpiWait) {
+      kpiWait.classList.remove("kpi-normal", "kpi-warning", "kpi-danger");
+      if (maxMins >= 15) kpiWait.classList.add("kpi-danger");
+      else if (maxMins >= 10) kpiWait.classList.add("kpi-warning");
+      else kpiWait.classList.add("kpi-normal");
+    }
+  }
+}
+
+function deslizarCarruselPreTriaje(direccion) {
+  const track = document.getElementById("pretriage_cards_track");
+  if (!track) return;
+  const desplazamiento = 280;
+  if (direccion === "prev") {
+    track.scrollBy({ left: -desplazamiento, behavior: "smooth" });
+  } else {
+    track.scrollBy({ left: desplazamiento, behavior: "smooth" });
+  }
+}
+
+function seleccionarPacientePreTriaje(id) {
+  if (!id) return;
+  if (typeof guardarEstadoPacienteActivo === "function") {
+    guardarEstadoPacienteActivo();
+  }
+  if (typeof cambiarPacienteActivo === "function") {
+    cambiarPacienteActivo(id);
+  } else if (typeof window.seleccionarExpediente === "function") {
+    window.seleccionarExpediente(id);
+  }
+  if (typeof irAModulo === "function") {
+    irAModulo(1);
+  }
+  if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
+    window.COCKPIT.irAFase(1);
+  }
+  renderizarCarruselPreTriaje();
+  const elFoco = document.getElementById("motivo_full") || document.getElementById("dni_mod1") || document.getElementById("fc_full");
+  if (elFoco) setTimeout(() => elFoco.focus(), 150);
+}
+
+window.renderizarCarruselPreTriaje = renderizarCarruselPreTriaje;
+window.actualizarCronometrosPreTriaje = actualizarCronometrosPreTriaje;
+window.deslizarCarruselPreTriaje = deslizarCarruselPreTriaje;
+window.seleccionarPacientePreTriaje = seleccionarPacientePreTriaje;
+window.esPacientePendienteDeTriaje = esPacientePendienteDeTriaje;
+
 function renderizarTableroColaPacientes() {
   const container = document.getElementById("activePatientsCardsList");
   const countBadge = document.getElementById("lbl_total_px_activos");
@@ -10120,74 +10452,84 @@ function renderizarTableroColaPacientes() {
   container.innerHTML = "";
 
   const badgesFlujo = {
-    "PENDIENTE_TRIAJE": { bg: "#fef3c7", text: "#92400e", label: "🩺 1. Triaje Pendiente" },
-    "ADMISION": { bg: "#e0f2fe", text: "#0369a1", label: "📋 2. Admisión & Seguros" },
-    "EN_ATENCION_MEDICA": { bg: "#f0fdf4", text: "#166534", label: "👨‍⚕️ 3. Atención Médica" },
-    "PENDIENTE_CAJA": { bg: "#fdf4ff", text: "#86198f", label: "💳 4. Pendiente Caja" },
-    "CERRADO_FACTURADO": { bg: "#f1f5f9", text: "#475569", label: "🏁 5. Cerrado" },
-    "ALTA_CLINICA": { bg: "#dcfce7", text: "#166534", label: "🏁 5. Alta Médica" }
+    "PENDIENTE_TRIAJE": { bg: "#fef3c7", text: "#92400e", label: "⏳ Triaje Pendiente" },
+    "ADMISION": { bg: "#e0f2fe", text: "#0369a1", label: "📋 Admisión" },
+    "EN_ATENCION_MEDICA": { bg: "#f0fdf4", text: "#166534", label: "👨‍⚕️ Atención Médica" },
+    "PENDIENTE_CAJA": { bg: "#fdf4ff", text: "#86198f", label: "💳 Pendiente Caja" },
+    "CERRADO_FACTURADO": { bg: "#f1f5f9", text: "#475569", label: "🏁 Cerrado" },
+    "ALTA_CLINICA": { bg: "#dcfce7", text: "#166534", label: "🏁 Alta Médica" }
   };
 
   pacientesActivosEnCurso.forEach(p => {
-    const prioCfg = COLORES_PRIORIDAD[p.prioridad] || COLORES_PRIORIDAD[null];
     const esActivo = (p.id === pacienteActivoId);
     const tiempoEspera = formatearTiempoEspera(p.timestampLlegada);
 
+    // Prioridad clínica: NUNCA asignar Prioridad 1 a un paciente en espera no evaluado
+    let badgePrioHtml = "";
+    let borderPrioColor = "#cbd5e1";
+
+    if (p.prioridad && COLORES_PRIORIDAD[p.prioridad]) {
+      const cfg = COLORES_PRIORIDAD[p.prioridad];
+      borderPrioColor = cfg.border;
+      badgePrioHtml = `<span class="card-prio-badge" style="background:${cfg.bg}; color:${cfg.text}; border:1px solid ${cfg.border}; font-weight:800; font-size:0.72rem; padding:2px 7px; border-radius:6px;">${cfg.label}</span>`;
+    } else {
+      borderPrioColor = "#cbd5e1";
+      badgePrioHtml = `<span class="card-prio-badge" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-weight:700; font-size:0.72rem; padding:2px 7px; border-radius:6px;">⏳ Por Evaluar</span>`;
+    }
+
+    const estadoFlujoActual = p.estadoFlujo || "PENDIENTE_TRIAJE";
+    const badgeFlujoCfg = badgesFlujo[estadoFlujoActual] || { bg: "#f1f5f9", text: "#475569", label: estadoFlujoActual };
+
+    // Identificación concisa (solo datos importantes)
+    const ticketStr = p.identificador || `Ticket T-${String(p.numero || 1).padStart(3, '0')}`;
+    const nombreVisual = (p.nombre && !p.nombre.includes("Paciente #")) ? `${ticketStr} · ${p.nombre}` : (p.nombre || ticketStr);
+
     const card = document.createElement("div");
     card.className = `patient-queue-card ${esActivo ? 'active-card' : ''}`;
-    card.style.borderLeft = `5px solid ${prioCfg.border}`;
-    card.onclick = () => {
+    card.style.borderLeft = `5px solid ${borderPrioColor}`;
+    card.onclick = (e) => {
+      // Si hizo clic en el botón de cerrar, no abrir detalle
+      if (e.target.closest(".btn-close-card")) return;
+
       if (typeof window.seleccionarExpediente === "function") {
         window.seleccionarExpediente(p.id);
       } else {
         cambiarPacienteActivo(p.id);
       }
+      // Al hacerle clic, mostrar todos los datos y su trazabilidad
+      if (typeof abrirModalDetalleYTrazabilidad === "function") {
+        abrirModalDetalleYTrazabilidad(p.id);
+      }
     };
 
-    // OMITIR CÓMO LLEGÓ O QUIÉN LO TRAJO EN EMERGENCIAS CRÍTICAS (NN, SHOCK TRAUMA, QUIRÓFANO)
-    const metaOrigen = (p.esEmergenciaDirecta || p.esNN)
-      ? `<span style="font-weight:700; color:#dc2626;">🚨 Pase Directo Vital</span>`
-      : `<span>${p.modalidad || 'A pie'}</span>`;
-
-    const metaDestino = p.camaNombre
-      ? `<span style="font-weight:700; color:#15803d;">🛏️ ${p.camaNombre}</span>`
-      : `<span style="font-weight:700; color:#0284c7;">${p.estadoAtencion || 'En Espera'}</span>`;
-
-    const medNombre = p.medico || (p.stateSnapshot && p.stateSnapshot.medicoTratante) || (esActivo && STATE.medicoTratante && STATE.medicoTratante !== "Por asignar" ? STATE.medicoTratante : null);
-    const metaMedico = medNombre && medNombre !== "Por asignar"
-      ? `<span style="font-weight:700; color:#0369a1; display:flex; align-items:center; gap:4px; font-size:0.72rem;">👨‍⚕️ ${medNombre}</span>`
-      : `<span style="color:#94a3b8; font-style:italic; font-size:0.72rem;">👨‍⚕️ Médico por asignar</span>`;
-
-    const estadoFlujoActual = p.estadoFlujo || "PENDIENTE_TRIAJE";
-    const badgeFlujoCfg = badgesFlujo[estadoFlujoActual] || { bg: "#f1f5f9", text: "#475569", label: estadoFlujoActual };
-
     card.innerHTML = `
-      <div class="card-top-row">
-        <span class="card-prio-badge" style="background:${prioCfg.bg}; color:${prioCfg.text}; border:1px solid ${prioCfg.border};">
-          ${prioCfg.label}
-        </span>
-        <span class="card-timer" id="timer_px_${p.id}" title="Tiempo desde su ingreso">⏱️ ${tiempoEspera}</span>
+      <div class="card-top-row" style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+        ${badgePrioHtml}
+        <span class="card-timer" id="timer_px_${p.id}" style="font-size:0.72rem; font-weight:700; color:#64748b;" title="Tiempo desde su ingreso">⏱️ ${tiempoEspera}</span>
       </div>
-      <div class="card-name" title="${p.nombre}">
-        ${p.esNN ? '🚨 ' : ''}${p.nombre}
+
+      <div class="card-name" style="font-weight:800; font-size:0.83rem; color:#0f172a; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${nombreVisual}">
+        ${p.esNN ? '🚨 ' : ''}${nombreVisual}
       </div>
-      <div style="margin:2px 0;">
-        <span style="font-size:0.68rem; font-weight:800; background:${badgeFlujoCfg.bg}; color:${badgeFlujoCfg.text}; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.06); display:inline-block;">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+        <span style="font-size:0.68rem; font-weight:700; background:${badgeFlujoCfg.bg}; color:${badgeFlujoCfg.text}; padding:2px 6px; border-radius:4px; border:1px solid rgba(0,0,0,0.06); display:inline-block;">
           ${badgeFlujoCfg.label}
         </span>
+        <span style="font-size:0.70rem; color:#0284c7; font-weight:700; display:flex; align-items:center; gap:3px;">
+          🔍 Clic: Trazabilidad ›
+        </span>
       </div>
-      <div class="card-meta">
-        ${metaOrigen}
-        ${metaDestino}
-      </div>
-      <div class="card-medico-row" style="margin-top:4px; padding-top:4px; border-top:1px dashed #e2e8f0;">
-        ${metaMedico}
-      </div>
+
       <button type="button" class="btn-close-card" onclick="cerrarAtencionPaciente('${p.id}', event)" title="Finalizar atención activa / Dar de alta médica">&times;</button>
     `;
 
     container.appendChild(card);
   });
+
+  if (typeof renderizarCarruselPreTriaje === "function") {
+    renderizarCarruselPreTriaje();
+  }
 }
 
 function cambiarPacienteActivo(nuevoId, forzarRehidratacion = false) {
@@ -10249,6 +10591,19 @@ function cambiarPacienteActivo(nuevoId, forzarRehidratacion = false) {
   // 2. Restaurar Inputs del Formulario DOM
   if (nuevoPx.formSnapshot && typeof aplicarFormulario === "function") {
     aplicarFormulario(nuevoPx.formSnapshot);
+  }
+
+  // Sincronizar seguro publico (FUA vs ESSI)
+  if (nuevoPx.tipoSeguro) {
+    STATE.tipoSeguro = nuevoPx.tipoSeguro;
+    STATE.tipoIpressPublica = nuevoPx.tipoIpressPublica || (nuevoPx.tipoSeguro === "EsSalud" ? "ESSALUD" : "MINSA");
+    const selIpress = document.getElementById("select_ipress_publica");
+    if (selIpress) selIpress.value = STATE.tipoIpressPublica;
+  }
+  if (nuevoPx.nroFua) { STATE.nroFua = nuevoPx.nroFua; STATE.numerFua = nuevoPx.nroFua; }
+  if (nuevoPx.nroEssi) STATE.nroEssi = nuevoPx.nroEssi;
+  if (typeof actualizarBotonesFormatoPublico === "function") {
+    actualizarBotonesFormatoPublico();
   }
 
   // Sincronizar identificador en Mod 1
@@ -10347,6 +10702,246 @@ function cerrarAtencionPaciente(id, event) {
   if (typeof notificarCambioColaGlobal === "function") notificarCambioColaGlobal("ACTUALIZAR");
   mostrarToastCola(`✅ Alta médica procesada: <strong>${px.nombre}</strong> (archivado en Bandeja de Posta).`);
 }
+
+// ===========================================================================
+// MODAL DE DETALLE CLÍNICO COMPLETO & TRAZABILIDAD (AL HACER CLIC EN EL TABLERO)
+// Cumplimiento NTS N° 042-MINSA, Ley N° 29414, Ley N° 29733 y SUSALUD audit_logs
+// ===========================================================================
+function abrirModalDetalleYTrazabilidad(id) {
+  const modal = document.getElementById("modal_detalle_trazabilidad_px");
+  const body = document.getElementById("modal_detalle_trazabilidad_body");
+  const title = document.getElementById("mod_trazabilidad_title");
+  if (!modal || !body) return;
+
+  const px = (PACIENTES_COLA || []).find(x => x.id === id);
+  if (!px) return;
+
+  const esActivo = (px.id === pacienteActivoId);
+  const snap = (esActivo && STATE) ? STATE : (px.stateSnapshot || {});
+
+  const identificador = px.identificador || `Ticket T-${String(px.numero || 1).padStart(3, '0')}`;
+  const nombre = (esActivo && STATE.nombreReniec) ? STATE.nombreReniec : (px.nombre || "Desconocido");
+  const dni = (esActivo && STATE.numDni) ? STATE.numDni : (px.dni || "Por registrar");
+  const edad = (snap.edad !== null && snap.edad !== undefined) ? `${snap.edad} años` : (px.edad ? `${px.edad} años` : "Por registrar");
+  const sexo = (snap.sexo === "F") ? "Femenino" : (snap.sexo === "M") ? "Masculino" : (px.sexo || "Desconocido");
+  const seguro = snap.tipoSeguro || px.tipoSeguro || "SIS";
+  const modalidad = px.modalidad || "A pie";
+
+  // Prioridad y CTAS (NUNCA mostrar prioridad 1 si es un paciente en espera no clasificado)
+  const prio = (esActivo && STATE.prioridad) ? STATE.prioridad : px.prioridad;
+  let prioBadgeHtml = `<span style="background:#f1f5f9; color:#475569; padding:4px 10px; border-radius:6px; font-weight:800; border:1px solid #cbd5e1;">⏳ Sin Prioridad (Por evaluar en Módulo 1)</span>`;
+  if (prio && COLORES_PRIORIDAD[prio]) {
+    const c = COLORES_PRIORIDAD[prio];
+    prioBadgeHtml = `<span style="background:${c.bg}; color:${c.text}; padding:4px 10px; border-radius:6px; font-weight:800; border:1px solid ${c.border};">Prioridad ${prio} · ${c.label}</span>`;
+  }
+
+  // Constantes fisiológicas
+  const spo2 = (snap.spo2 !== null && snap.spo2 !== undefined) ? `${snap.spo2}%` : "--";
+  const fc = (snap.fc !== null && snap.fc !== undefined) ? `${snap.fc} lpm` : "--";
+  const pa = (snap.pasSistolica && snap.paDiastolica) ? `${snap.pasSistolica}/${snap.paDiastolica} mmHg` : "--";
+  const fr = (snap.fr !== null && snap.fr !== undefined) ? `${snap.fr} rpm` : "--";
+  const temp = (snap.temperatura !== null && snap.temperatura !== undefined) ? `${snap.temperatura} °C` : "--";
+  const gcs = (snap.glasgow !== null && snap.glasgow !== undefined) ? `${snap.glasgow}/15` : "--";
+  const gluc = (snap.glucosa !== null && snap.glucosa !== undefined) ? `${snap.glucosa} mg/dL` : "--";
+  const eva = (snap.eva !== null && snap.eva !== undefined) ? `${snap.eva}/10` : "--";
+  const motivo = snap.motivoConsulta || px.motivo || "Sin motivo registrado aún";
+  const cie10 = snap.diagnosticoCIE10 || px.cie10 || "Pendiente de diagnóstico médico (Módulo 4)";
+  const cama = snap.camaAsignada || px.camaNombre || "Sin cama física (En espera de evaluación médica)";
+  const medico = snap.medicoTratante || px.medico || "Por asignar";
+
+  // Trazabilidad de Timestamps
+  const horaArribo = px.horaLlegada || (px.timestampLlegada ? new Date(px.timestampLlegada).toLocaleTimeString() : "--");
+  const tiempoTranscurrido = formatearTiempoEspera(px.timestampLlegada);
+
+  // Filtrar logs de auditoría para este paciente
+  let logsHistorial = AUDIT_LOGS || [];
+  try {
+    const raw = localStorage.getItem("AUDIT_LOGS_HISTORIAL");
+    if (raw) logsHistorial = JSON.parse(raw);
+  } catch(e){}
+
+  const logsPx = logsHistorial.filter(l => {
+    return (l.dni && dni && l.dni === dni) || (l.detalle && (l.detalle.includes(identificador) || l.detalle.includes(px.id)));
+  });
+
+  if (title) title.textContent = `Expediente & Trazabilidad: ${identificador} (${nombre})`;
+
+  body.innerHTML = `
+    <!-- 1. Encabezado de Filiación Rápida -->
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+        <div>
+          <div style="font-size:1.1rem; font-weight:800; color:#0f172a;">${identificador} · ${nombre}</div>
+          <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+            DNI: <strong style="color:#0284c7;">${dni}</strong> | Edad: <strong>${edad}</strong> | Sexo: <strong>${sexo}</strong> | Arribo: <strong>${modalidad}</strong>
+          </div>
+        </div>
+        <div>
+          ${prioBadgeHtml}
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:8px; font-size:0.75rem; color:#475569; flex-wrap:wrap;">
+        <span>Financiador: <strong style="color:#0f172a;">${seguro}</strong></span>
+        <span>•</span>
+        <span>Doc. Asistencial: <strong style="color:#0284c7;">${(seguro === "EsSalud" || snap.tipoIpressPublica === "ESSALUD") ? (snap.nroEssi || px.nroEssi || STATE.nroEssi || "ESSI-Pendiente") : (snap.nroFua || px.nroFua || STATE.nroFua || "FUA-Pendiente")}</strong></span>
+        <span>•</span>
+        <span>Ubicación/Cama: <strong style="color:#15803d;">${cama}</strong></span>
+        <span>•</span>
+        <span>Médico: <strong style="color:#0369a1;">${medico}</strong></span>
+        <span>•</span>
+        <span>Tiempo en Espera: <strong style="color:#b45309;">⏱️ ${tiempoTranscurrido}</strong></span>
+      </div>
+    </div>
+
+    <!-- 2. Constantes Fisiológicas de Triaje CTAS -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.80rem; font-weight:800; color:#334155; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">
+        🩺 Constantes Fisiológicas (Modificadores CTAS)
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(85px, 1fr)); gap:6px;">
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">SpO2</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0284c7;">${spo2}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">FC</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${fc}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">PA Art.</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${pa}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">FR</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${fr}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">Temp.</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${temp}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">Glasgow</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${gcs}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">Glucemia</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${gluc}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:0.68rem; color:#64748b; font-weight:700;">EVA Dolor</div>
+          <div style="font-size:0.95rem; font-weight:800; color:#0f172a;">${eva}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px; font-size:0.75rem; background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+        <strong>Motivo de Ingreso / Queja:</strong> ${motivo}
+      </div>
+    </div>
+
+    <!-- 3. Línea de Tiempo de Fases Asistenciales (Timestamps) -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:0.80rem; font-weight:800; color:#334155; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.5px;">
+        ⏱️ Línea de Tiempo &amp; Flujo Asistencial (NTS N° 042-MINSA)
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px;">
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid #0284c7; border-radius:8px; padding:8px;">
+          <div style="font-size:0.70rem; font-weight:800; color:#0284c7;">1. Arribo Sala</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">🕒 ${horaArribo}</div>
+          <div style="font-size:0.68rem; color:#64748b;">Registrado en espera</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${prio ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
+          <div style="font-size:0.70rem; font-weight:800; color:${prio ? '#059669' : '#64748b'};">2. Triaje CTAS</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${prio ? '✓ Clasificado' : '⏳ Pendiente'}</div>
+          <div style="font-size:0.68rem; color:#64748b;">${prio ? `Nivel P-${prio}` : 'En sala de espera'}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${snap.coberturaValidada ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
+          <div style="font-size:0.70rem; font-weight:800; color:${snap.coberturaValidada ? '#059669' : '#64748b'};">3. Admisión / Seguro</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${snap.coberturaValidada ? '✓ Validado' : '⏳ Pendiente'}</div>
+          <div style="font-size:0.68rem; color:#64748b;">${seguro}</div>
+        </div>
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${snap.cie10 || snap.diagnosticoCIE10 ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
+          <div style="font-size:0.70rem; font-weight:800; color:${snap.cie10 || snap.diagnosticoCIE10 ? '#059669' : '#64748b'};">4. Atención Médica</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${snap.cie10 || snap.diagnosticoCIE10 ? '✓ Evaluado' : '⏳ En curso'}</div>
+          <div style="font-size:0.68rem; color:#64748b;">${String(cie10).substring(0, 20)}...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Bitácora Inmutable de Auditoría SUSALUD (audit_logs) -->
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-size:0.80rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.5px;">
+          🛡️ Bitácora Inmutable de Auditoría SUSALUD (audit_logs)
+        </div>
+        <span style="font-size:0.70rem; color:#64748b;">Ley N° 29733 &amp; NTS N° 139-MINSA</span>
+      </div>
+      <div style="max-height:160px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+        ${logsPx.length > 0 ? `
+          <table style="width:100%; border-collapse:collapse; font-size:0.72rem; text-align:left;">
+            <thead>
+              <tr style="background:#0f172a; color:#ffffff;">
+                <th style="padding:6px 8px;">Hora</th>
+                <th style="padding:6px 8px;">Rol</th>
+                <th style="padding:6px 8px;">Evento</th>
+                <th style="padding:6px 8px;">Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logsPx.map((l, i) => `
+                <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}; border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:5px 8px; font-family:monospace; color:#64748b;">${l.timestamp}</td>
+                  <td style="padding:5px 8px; font-weight:700;">${l.rol}</td>
+                  <td style="padding:5px 8px; font-weight:700; color:#0284c7;">${l.evento}</td>
+                  <td style="padding:5px 8px; color:#334155;">${l.detalle}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : `
+          <div style="padding:14px; text-align:center; color:#94a3b8; font-size:0.75rem;">
+            No se registran eventos críticos de auditoría previos para este paciente (Paciente recién ingresado).
+          </div>
+        `}
+      </div>
+    </div>
+
+    <!-- 5. Acciones al pie -->
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:14px; border-top:1px solid #e2e8f0; padding-top:12px;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-full-secondary" style="padding:8px 14px; font-weight:700; font-size:0.78rem;" onclick="imprimirBrazaleteDirecto ? imprimirBrazaleteDirecto() : imprimirBrazalete()">
+          🏷️ Imprimir Pulsera QR
+        </button>
+        <button type="button" class="btn-full-secondary" style="padding:8px 14px; font-weight:700; font-size:0.78rem; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;" onclick="imprimirFormatoPublicoSegunRegimen()">
+          ${(seguro === "EsSalud" || snap.tipoIpressPublica === "ESSALUD") ? '📄 Formato ESSI (EsSalud)' : '📄 Formato FUA (MINSA/SIS)'}
+        </button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-full-secondary" style="padding:8px 16px; font-weight:700; font-size:0.78rem;" onclick="cerrarModalDetalleYTrazabilidad()">
+          ✕ Cerrar
+        </button>
+        <button type="button" class="btn-full-primary" style="padding:8px 18px; font-weight:800; font-size:0.78rem;" onclick="irAAtencionDirectaPaciente('${px.id}')">
+          🩺 Ir a Atender Paciente
+        </button>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+}
+
+function cerrarModalDetalleYTrazabilidad() {
+  const m = document.getElementById("modal_detalle_trazabilidad_px");
+  if (m) m.style.display = "none";
+}
+
+function irAAtencionDirectaPaciente(id) {
+  cerrarModalDetalleYTrazabilidad();
+  if (typeof cambiarPacienteActivo === "function") {
+    cambiarPacienteActivo(id);
+  }
+}
+window.abrirModalDetalleYTrazabilidad = abrirModalDetalleYTrazabilidad;
+window.cerrarModalDetalleYTrazabilidad = cerrarModalDetalleYTrazabilidad;
+window.irAAtencionDirectaPaciente = irAAtencionDirectaPaciente;
 
 function abrirModalAdmisionRapidaNN() {
   const m = document.getElementById("modalAdmisionNN");
@@ -10719,8 +11314,60 @@ function registrarPacienteEnEspera() {
   STATE.numDni = "";
   STATE.prioridad = null;
   STATE.prioridadCTAS = null;
+  STATE.colorPrioridad = null;
+  STATE.ctasNivel = null;
+  STATE.resultadoTriajeEstandar = null;
+  STATE.camaAsignada = null;
+  STATE.camaAsignadaId = null;
   STATE.estadoFlujo = "PENDIENTE_TRIAJE";
+  STATE.estadoAtencion = "En Espera de Triaje";
   STATE.historiaClinica = `HC-2026-${String(num).padStart(4, '0')}`;
+  STATE.tipoSeguro = nuevoPx.tipoSeguro;
+  STATE.tipoIpressPublica = nuevoPx.tipoIpressPublica;
+  STATE.nroFua = nuevoPx.nroFua;
+  STATE.nroEssi = nuevoPx.nroEssi;
+  STATE.numerFua = nuevoPx.nroFua || "";
+  const selIpressEsp = document.getElementById("select_ipress_publica");
+  if (selIpressEsp) selIpressEsp.value = STATE.tipoIpressPublica;
+  if (typeof actualizarBotonesFormatoPublico === "function") {
+    actualizarBotonesFormatoPublico();
+  }
+
+  if (typeof limpiarPrioridadUI === "function") {
+    limpiarPrioridadUI();
+  }
+
+  // Garantizar que ningún indicador visual muestre Prioridad 1 ni ninguna prioridad previa
+  const chipLive = document.getElementById("chipPrioLive");
+  if (chipLive) {
+    chipLive.textContent = "Sin Prioridad (Por evaluar)";
+    chipLive.className = "top-prio-chip";
+    chipLive.style.background = "#f1f5f9";
+    chipLive.style.color = "#64748b";
+    chipLive.style.border = "1px solid #cbd5e1";
+  }
+  const miniPrio = document.getElementById("mini_prioridad_badge");
+  if (miniPrio) {
+    miniPrio.textContent = "🚦 Triaje: Por evaluar";
+    miniPrio.style.background = "#f1f5f9";
+    miniPrio.style.color = "#64748b";
+  }
+  const pxPrio = document.getElementById("cockpit_pill_prioridad");
+  if (pxPrio) {
+    pxPrio.className = "ui-badge-pill";
+    pxPrio.textContent = "⏳ Sin Prioridad (Por evaluar)";
+    pxPrio.style.background = "#f1f5f9";
+    pxPrio.style.color = "#64748b";
+    pxPrio.style.border = "1px solid #cbd5e1";
+  }
+  const elPrioDisplay = document.getElementById("prioridad_display");
+  if (elPrioDisplay) elPrioDisplay.style.display = "none";
+  const elPrioNum = document.getElementById("prio_numero");
+  if (elPrioNum) elPrioNum.textContent = "--";
+  const elPrioTipo = document.getElementById("prio_tipo");
+  if (elPrioTipo) elPrioTipo.textContent = "PRIORIDAD --";
+  const elPrioDest = document.getElementById("prio_destino");
+  if (elPrioDest) elPrioDest.textContent = "Destino: Por evaluar";
 
   const elIdent = document.getElementById("ident_full");
   if (elIdent) elIdent.value = ticketStr;
@@ -10752,10 +11399,14 @@ function registrarPacienteEnEspera() {
   mostrarToastCola(`👤 <strong>Nuevo Paciente en Espera:</strong> ${ticketStr} registrado. Ingrese sus datos manualmente.`);
 }
 window.registrarPacienteEnEspera = registrarPacienteEnEspera;
+window.crearRegistroPaciente = crearRegistroPaciente;
 
 function inicializarTableroColaPacientes() {
   // Inicia 100% en blanco: NO coloca automáticamente ningún paciente en espera
   renderizarTableroColaPacientes();
+  if (typeof renderizarCarruselPreTriaje === "function") {
+    renderizarCarruselPreTriaje();
+  }
 
   if (!intervalCronometrosCola) {
     intervalCronometrosCola = setInterval(() => {
@@ -10765,6 +11416,9 @@ function inicializarTableroColaPacientes() {
           elTimer.textContent = `⏱️ ${formatearTiempoEspera(p.timestampLlegada)}`;
         }
       });
+      if (typeof actualizarCronometrosPreTriaje === "function") {
+        actualizarCronometrosPreTriaje();
+      }
     }, 1000);
   }
 }
@@ -14507,17 +15161,15 @@ function construirHTMLDocumentoConsentimiento() {
   const hashToken = Math.abs((dniPx + nomPx + fechaHoy).split("").reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, '0');
   const docHashToken = Math.abs((medResponsable + fechaHoy).split("").reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, '0');
 
-  // Trazo caligráfico digitalizado del paciente
+  // Firma del paciente: En blanco (RENIEC aún no implementa el sistema de firma digital ciudadana para pacientes)
   const svgFirmaPaciente = `
-    <div style="height:50px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-      <svg width="190" height="48" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 12 36 C 26 10, 36 44, 50 18 C 62 4, 72 38, 88 16 C 100 4, 114 34, 128 14 C 140 6, 152 28, 166 12 C 174 6, 180 22, 186 10" stroke="#0f2b5c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M 18 42 C 65 46, 118 43, 178 35 M 138 46 C 158 42, 172 39, 186 32" stroke="#0f2b5c" stroke-width="1.9" stroke-linecap="round"/>
-      </svg>
+    <div style="height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px dashed #cbd5e1; background:#ffffff; border-radius:4px; margin-bottom:4px;">
+      <span style="font-size:7.8px; color:#94a3b8; font-style:italic;">(Espacio en blanco para firma manuscrita física)</span>
+      <span style="font-size:6.8px; color:#cbd5e1; font-family:monospace;">RENIEC: Sistema no implementado</span>
     </div>
   `;
 
-  // Trazo caligráfico digitalizado del médico tratante
+  // Trazo caligráfico digitalizado del médico tratante (Personal de Salud con firma digital simulada)
   const svgFirmaMedico = `
     <div style="height:50px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
       <svg width="190" height="48" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -14527,16 +15179,10 @@ function construirHTMLDocumentoConsentimiento() {
     </div>
   `;
 
-  // Huella dactilar digitalizada
+  // Huella dactilar física en blanco para impresión
   const svgHuellaBiometrica = `
-    <div style="height:50px; display:flex; align-items:center; justify-content:center;">
-      <svg width="40" height="48" viewBox="0 0 40 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 20 5 C 12 5, 6 12, 6 22 C 6 32, 12 41, 20 45 C 28 41, 34 32, 34 22 C 34 12, 28 5, 20 5 Z" stroke="#1e3a8a" stroke-width="1.2" stroke-linecap="round"/>
-        <path d="M 20 9 C 14 9, 9 15, 9 23 C 9 31, 14 38, 20 42 C 26 38, 31 31, 31 23 C 31 15, 26 9, 20 9 Z" stroke="#1e3a8a" stroke-width="1.2" stroke-linecap="round"/>
-        <path d="M 20 14 C 17 14, 13 18, 13 24 C 13 30, 17 35, 20 38 C 23 35, 27 30, 27 24 C 27 18, 23 14, 20 14 Z" stroke="#1e3a8a" stroke-width="1.2" stroke-linecap="round"/>
-        <path d="M 20 18 C 18 18, 16 20, 16 25 C 16 29, 18 32, 20 34 C 22 32, 24 29, 24 25 C 24 20, 22 18, 20 18 Z" stroke="#1e3a8a" stroke-width="1.2" stroke-linecap="round"/>
-        <path d="M 20 22 L 20 29" stroke="#1e3a8a" stroke-width="1.4" stroke-linecap="round"/>
-      </svg>
+    <div style="height:50px; display:flex; flex-direction:column; align-items:center; justify-content:center; border:1px dashed #cbd5e1; background:#ffffff; border-radius:4px;">
+      <span style="font-size:7px; color:#94a3b8; text-align:center;">Huella dactilar<br>(en blanco)</span>
     </div>
   `;
 
@@ -14575,12 +15221,12 @@ function construirHTMLDocumentoConsentimiento() {
         ${svgFirmaPaciente}
         <div style="border-bottom:1.5px solid #0284c7; margin-top:2px;"></div>
         <div style="margin-top:4px; font-weight:800; font-size:9.5px; color:#0369a1; letter-spacing:0.3px;">
-          ✍️ FIRMA DIGITALIZADA REPRESENTANTE LEGAL
+          ✍️ FIRMA REPRESENTANTE LEGAL (MANUSCRITA EN BLANCO)
         </div>
         <div style="font-size:9px; color:#0f172a; font-weight:800;">Representante de: ${nomPx}</div>
         <div style="font-size:7.8px; color:#475569;">DNI: <strong>${dniPx !== "S/D (INDOCUMENTADO)" ? dniPx : "Acreditado"}</strong> · Parentesco Directo</div>
-        <div style="font-size:7.2px; color:#0284c7; font-family:monospace; margin-top:2px; font-weight:700;">
-          Ley N° 29414 · TOKEN: REP-SHA256-${hashToken}
+        <div style="font-size:7.2px; color:#64748b; font-family:monospace; margin-top:2px; font-weight:700;">
+          Firma en blanco · RENIEC no implementa firma digital ciudadana
         </div>
       </td>
     `;
@@ -14596,12 +15242,12 @@ function construirHTMLDocumentoConsentimiento() {
         ${svgFirmaPaciente}
         <div style="border-bottom:1.5px solid #dc2626; margin-top:2px;"></div>
         <div style="margin-top:4px; font-weight:800; font-size:9.5px; color:#991b1b; letter-spacing:0.3px;">
-          ✍️ FIRMA DIGITALIZADA DE DISENTIMIENTO
+          ✍️ FIRMA DE DISENTIMIENTO (MANUSCRITA EN BLANCO)
         </div>
         <div style="font-size:9px; color:#0f172a; font-weight:800;">${nomPx}</div>
         <div style="font-size:7.8px; color:#475569;">DNI: <strong>${dniPx}</strong> · Titular en Pleno Uso de Facultades</div>
-        <div style="font-size:7.2px; color:#dc2626; font-family:monospace; margin-top:2px; font-weight:700;">
-          Art. 15° Ley N° 26842 · TOKEN: DIS-SHA256-${hashToken}
+        <div style="font-size:7.2px; color:#64748b; font-family:monospace; margin-top:2px; font-weight:700;">
+          Firma en blanco · RENIEC no implementa firma digital ciudadana
         </div>
       </td>
     `;
@@ -14616,12 +15262,12 @@ function construirHTMLDocumentoConsentimiento() {
         ${svgFirmaPaciente}
         <div style="border-bottom:1.5px solid #0f2b5c; margin-top:2px;"></div>
         <div style="margin-top:4px; font-weight:800; font-size:9.5px; color:#0f2b5c; letter-spacing:0.3px;">
-          ✍️ FIRMA DIGITALIZADA DEL PACIENTE
+          ✍️ FIRMA DEL PACIENTE (MANUSCRITA EN BLANCO)
         </div>
         <div style="font-size:9px; color:#0f172a; font-weight:800;">${nomPx}</div>
         <div style="font-size:7.8px; color:#334155;">DNI: <strong>${dniPx}</strong> · Paciente Titular Consciente</div>
-        <div style="font-size:7.2px; color:#16a34a; font-family:monospace; margin-top:2px; font-weight:700;">
-          ✓ RENIEC VERIFICADO · TOKEN: PX-${hashToken}
+        <div style="font-size:7.2px; color:#64748b; font-family:monospace; margin-top:2px; font-weight:700;">
+          Firma en blanco · RENIEC no implementa firma digital ciudadana
         </div>
       </td>
     `;
@@ -14702,8 +15348,8 @@ function construirHTMLDocumentoConsentimiento() {
             <div style="font-size:7.5px; color:#475569;">
               Índice Derecho · Biometría DNIe
             </div>
-            <div style="font-size:7px; color:#16a34a; font-weight:700; margin-top:2px;">
-              🛡️ RENIEC AFIS: 100% Cotejado
+            <div style="font-size:7px; color:#64748b; font-weight:700; margin-top:2px;">
+              Toma Dactilar Física (En blanco)
             </div>
           </td>
 
@@ -14711,7 +15357,7 @@ function construirHTMLDocumentoConsentimiento() {
             ${svgFirmaMedico}
             <div style="border-bottom:1.5px solid #0284c7; margin-top:2px;"></div>
             <div style="margin-top:4px; font-weight:800; font-size:9.5px; color:#0369a1; letter-spacing:0.3px;">
-              🔏 FIRMA DIGITAL CERTIFICADA (LEY N° 27269)
+              🔏 FIRMA DIGITAL SIMULADA PERSONAL DE SALUD (LEY N° 27269)
             </div>
             <div style="font-size:9px; color:#0f172a; font-weight:800; margin-top:1px;">${datosMed.nombre}</div>
             <div style="font-size:7.8px; color:#0284c7; font-weight:700;">${datosMed.especialidad}</div>
@@ -14729,7 +15375,7 @@ function construirHTMLDocumentoConsentimiento() {
           <span>⚖️</span>
           <span>VALIDEZ LEGAL Y EFICACIA JURÍDICA DE FIRMA DIGITAL Y DIGITALIZADA (MARCO NORMATIVO PERUANO):</span>
         </div>
-        El presente Consentimiento Informado ha sido suscrito mediante <strong>Firma Digitalizada del Paciente / Representante Legal</strong> (con cotejo biométrico DNIe) y <strong>Firma Digital del Médico Asistencial Tratante</strong> respaldada con certificado digital acreditado, en estricto cumplimiento de la <strong>Ley N° 27269</strong> (Ley de Firmas y Certificados Digitales), <strong>D.S. N° 052-2008-PCM</strong>, la <strong>NTS N° 139-MINSA/DGIEM</strong> (Norma Técnica para la Gestión de la Historia Clínica), los Artículos 4° y 15° de la <strong>Ley N° 26842</strong> (Ley General de Salud) y la <strong>Ley N° 29414</strong>. Ambas firmas gozan de plena validez, integridad e inmutabilidad con idéntica eficacia probatoria que la firma manuscrita.
+        El presente Consentimiento Informado cuenta con la <strong>Firma Digital Simulada del Personal de Salud</strong> (Médico Asistencial Tratante) respaldada con certificado digital acreditado bajo la <strong>Ley N° 27269</strong> (Ley de Firmas y Certificados Digitales), y la <strong>Firma Manuscrita en blanco del Paciente / Representante Legal</strong> para suscripción física debido a que el sistema de firma digital ciudadana para pacientes aún no ha sido implementado por RENIEC (Art. 4° y 15° de la Ley N° 26842 &amp; NTS N° 139-MINSA).
       </div>
 
       <div style="margin-top:10px; text-align:center; font-size:8px; color:#64748b; border-top:1px solid #e2e8f0; padding-top:4px;">
@@ -15107,13 +15753,27 @@ window.admitirEmergenciaNN = admitirEmergenciaNN;
 function cambiarIpressPublica(valor) {
   STATE.tipoIpressPublica = valor || "MINSA";
   if (valor === "MINSA") {
+    STATE.tipoSeguro = "SIS";
     STATE.nroFua = STATE.nroFua || `FUA-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    STATE.numerFua = STATE.nroFua;
     STATE.estadoFua = STATE.estadoFua || "ABIERTO";
   } else if (valor === "ESSALUD") {
+    STATE.tipoSeguro = "EsSalud";
     STATE.nroEssi = STATE.nroEssi || `ESSI-2026-${Math.floor(100000 + Math.random() * 900000)}`;
     STATE.estadoEssi = STATE.estadoEssi || "ABIERTO";
+    STATE.acreditadoEsSalud = true;
+  }
+  const pxActivo = (PACIENTES_COLA || []).find(p => p.id === pacienteActivoId);
+  if (pxActivo) {
+    pxActivo.tipoSeguro = STATE.tipoSeguro;
+    pxActivo.tipoIpressPublica = STATE.tipoIpressPublica;
+    pxActivo.nroFua = STATE.nroFua;
+    pxActivo.nroEssi = STATE.nroEssi;
   }
   actualizarFactura();
+  if (typeof actualizarBotonesFormatoPublico === "function") {
+    actualizarBotonesFormatoPublico();
+  }
   if (window.COCKPIT && typeof window.COCKPIT.actualizarTarjetaResumenTriaje === "function") {
     window.COCKPIT.actualizarTarjetaResumenTriaje();
   }
@@ -15391,9 +16051,41 @@ function ejecutarJuntaMedicaNTS139() {
   // Registrar en audit_logs inmutable
   registrarLogAuditoria("Módulo 4", "ACTA_JUNTA_MEDICA_NTS139", `Acta ${numActa} suscrita colegiadamente para ${paciente} (${hc}): Consenso ${cie10} -> ${recursoCama} [Firmado electrónicamente por los 3 facultativos]`);
 
-  // Renderizar Acta en #box_acta_junta_medica
+  // Renderizar Acta en #box_acta_junta_medica con firmas digitalizadas de todos los miembros
   const box = document.getElementById("box_acta_junta_medica");
   if (box) {
+    const hashDoc1 = Math.abs((paciente + "45210" + fechaStr).split("").reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, '0');
+    const hashDoc2 = Math.abs((paciente + "51892" + fechaStr).split("").reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, '0');
+    const hashDoc3 = Math.abs((paciente + "32187" + fechaStr).split("").reduce((acc, c) => ((acc << 5) - acc) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, '0');
+
+    const svgFirmaMendoza = `
+      <div style="height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; margin:4px 0;">
+        <svg width="180" height="44" viewBox="0 0 180 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 12 32 C 24 8, 38 40, 52 14 C 64 2, 76 34, 90 10 C 102 4, 114 26, 128 8 M 20 36 C 65 39, 118 36, 172 26" stroke="#0369a1" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="168" cy="12" r="2.3" fill="#0369a1"/>
+        </svg>
+      </div>
+    `;
+
+    const svgFirmaParedes = `
+      <div style="height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; margin:4px 0;">
+        <svg width="180" height="44" viewBox="0 0 180 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 14 28 C 22 10, 32 38, 46 16 C 58 4, 68 36, 82 12 C 94 6, 104 30, 120 10 C 132 2, 146 26, 162 8 M 38 36 C 75 38, 120 34, 168 24" stroke="#0f766e" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M 156 16 L 168 32" stroke="#0f766e" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </div>
+    `;
+
+    const svgFirmaZevallos = `
+      <div style="height:48px; display:flex; align-items:center; justify-content:center; overflow:hidden; margin:4px 0;">
+        <svg width="180" height="44" viewBox="0 0 180 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 14 20 C 26 6, 40 34, 56 10 C 68 4, 78 38, 94 16 C 108 4, 120 30, 136 12 C 146 6, 156 22, 166 8 M 20 38 C 60 40, 110 37, 166 30" stroke="#4338ca" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="158" cy="10" r="2.3" fill="#4338ca"/>
+          <circle cx="166" cy="16" r="2.1" fill="#4338ca"/>
+        </svg>
+      </div>
+    `;
+
     box.style.display = "block";
     box.innerHTML = `
       <div class="acta-junta-card" style="background:#ffffff; border:2px solid #6366f1; border-radius:12px; padding:18px; margin-top:12px; box-shadow:0 4px 14px rgba(99,102,241,0.12);">
@@ -15416,34 +16108,56 @@ function ejecutarJuntaMedicaNTS139() {
           </ul>
         </div>
 
-        <!-- MIEMBROS FIRMANTES CON CERTIFICADO DIGITAL INDIVIDUAL -->
+        <!-- MIEMBROS FIRMANTES CON FIRMAS DIGITALIZADAS INDIVIDUALES -->
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
           <div style="font-size:0.72rem; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
             <span>Miembros Firmantes de la Junta Médica (Ley N° 27269):</span>
-            <span style="color:#16a34a; font-weight:800; font-size:0.70rem;">✓ 3 de 3 Firmas Electrónicas Suscritas</span>
+            <span style="color:#16a34a; font-weight:800; font-size:0.70rem;">✓ 3 de 3 Firmas Digitalizadas Suscritas</span>
           </div>
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; font-size:0.76rem;">
-            <div style="border-left:3px solid #16a34a; background:#ffffff; padding:8px 10px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0;">
-              <strong style="color:#0f172a;">Dr. Carlos Mendoza Alva</strong><br>
-              <span style="color:#64748b; font-size:0.71rem;">Emergenciólogo Tratante · CMP 45210 · RNE 23901</span>
-              <div style="margin-top:6px; font-size:0.67rem; color:#15803d; font-weight:800; display:flex; align-items:center; gap:4px; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #bbf7d0;">
-                <span>✍️ Firmado Electrónicamente</span> · <span>Token Válido</span>
+            
+            <!-- Miembro 1 -->
+            <div style="border-left:3px solid #0284c7; background:#ffffff; padding:10px 12px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <strong style="color:#0f172a; font-size:0.80rem;">Dr. Carlos Mendoza Alva</strong><br>
+                <span style="color:#64748b; font-size:0.71rem;">Emergenciólogo Tratante · CMP 45210 · RNE 23901</span>
+              </div>
+              ${svgFirmaMendoza}
+              <div style="border-bottom:1.5px solid #0284c7; margin-bottom:6px;"></div>
+              <div style="font-size:0.67rem; color:#0369a1; font-weight:800; display:flex; align-items:center; justify-content:space-between; background:#f0f9ff; padding:3px 6px; border-radius:4px; border:1px solid #bae6fd;">
+                <span>✍️ Firma Digitalizada</span>
+                <span style="font-family:monospace;">SHA256-${hashDoc1}</span>
               </div>
             </div>
-            <div style="border-left:3px solid #16a34a; background:#ffffff; padding:8px 10px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0;">
-              <strong style="color:#0f172a;">Dr. Juan Manuel Paredes</strong><br>
-              <span style="color:#64748b; font-size:0.71rem;">Especialista Clínico / Quirúrgico · CMP 51892 · RNE 27415</span>
-              <div style="margin-top:6px; font-size:0.67rem; color:#15803d; font-weight:800; display:flex; align-items:center; gap:4px; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #bbf7d0;">
-                <span>✍️ Firmado Electrónicamente</span> · <span>Token Válido</span>
+
+            <!-- Miembro 2 -->
+            <div style="border-left:3px solid #0d9488; background:#ffffff; padding:10px 12px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <strong style="color:#0f172a; font-size:0.80rem;">Dr. Juan Manuel Paredes</strong><br>
+                <span style="color:#64748b; font-size:0.71rem;">Especialista Quirúrgico · CMP 51892 · RNE 27415</span>
+              </div>
+              ${svgFirmaParedes}
+              <div style="border-bottom:1.5px solid #0d9488; margin-bottom:6px;"></div>
+              <div style="font-size:0.67rem; color:#0f766e; font-weight:800; display:flex; align-items:center; justify-content:space-between; background:#f0fdfa; padding:3px 6px; border-radius:4px; border:1px solid #99f6e4;">
+                <span>✍️ Firma Digitalizada</span>
+                <span style="font-family:monospace;">SHA256-${hashDoc2}</span>
               </div>
             </div>
-            <div style="border-left:3px solid #16a34a; background:#ffffff; padding:8px 10px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0;">
-              <strong style="color:#0f172a;">Dra. Mariana Zevallos Ríos</strong><br>
-              <span style="color:#64748b; font-size:0.71rem;">Jefa de Guardia / Auditora · CMP 32187 · RNE 18452</span>
-              <div style="margin-top:6px; font-size:0.67rem; color:#15803d; font-weight:800; display:flex; align-items:center; gap:4px; background:#ecfdf5; padding:2px 6px; border-radius:4px; border:1px solid #bbf7d0;">
-                <span>✍️ Firmado Electrónicamente</span> · <span>Token Válido</span>
+
+            <!-- Miembro 3 -->
+            <div style="border-left:3px solid #4f46e5; background:#ffffff; padding:10px 12px; border-radius:0 6px 6px 0; border-top:1px solid #e2e8f0; border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <strong style="color:#0f172a; font-size:0.80rem;">Dra. Mariana Zevallos Ríos</strong><br>
+                <span style="color:#64748b; font-size:0.71rem;">Jefa de Guardia / Auditora · CMP 32187 · RNE 18452</span>
+              </div>
+              ${svgFirmaZevallos}
+              <div style="border-bottom:1.5px solid #4f46e5; margin-bottom:6px;"></div>
+              <div style="font-size:0.67rem; color:#4338ca; font-weight:800; display:flex; align-items:center; justify-content:space-between; background:#eef2ff; padding:3px 6px; border-radius:4px; border:1px solid #c7d2fe;">
+                <span>✍️ Firma Digitalizada</span>
+                <span style="font-family:monospace;">SHA256-${hashDoc3}</span>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -16055,3 +16769,444 @@ window.cambiarFechaConsultaHistorico = cambiarFechaConsultaHistorico;
 window.gestionarInicioDiarioGuardia = gestionarInicioDiarioGuardia;
 window.archivarPacienteEnHistorialDiario = archivarPacienteEnHistorialDiario;
 window.verDetallePacienteHistorico = verDetallePacienteHistorico;
+
+
+// ==============================================================================
+// GESTIÓN OFICIAL DE FORMATOS PÚBLICOS: FUA (MINSA/SIS) & ESSI (EsSalud)
+// ==============================================================================
+
+/**
+ * Actualiza dinámicamente las etiquetas y números de formato en los botones de M2, M3 (Médico) y M8 (Caja)
+ */
+function actualizarBotonesFormatoPublico() {
+  const esEsSalud = (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD");
+  const docTipo = esEsSalud ? "ESSI" : "FUA";
+  const numDoc = esEsSalud ? (STATE.nroEssi || "ESSI-2026-000000") : (STATE.nroFua || "FUA-2026-000000");
+
+  const btnM2 = document.getElementById("btn_ver_formato_publico");
+  if (btnM2) {
+    btnM2.textContent = esEsSalud ? `📄 Ver Hoja ESSI (${numDoc})` : `📄 Ver Formato FUA (${numDoc})`;
+    btnM2.title = esEsSalud ? "Hoja Oficial de Atención de Emergencia EsSalud (ESSI)" : "Formato Único de Atención Oficial MINSA/SIS (FUA)";
+  }
+
+  const lblMed = document.getElementById("lbl_btn_fua_essi_medico");
+  if (lblMed) {
+    lblMed.textContent = esEsSalud ? `Formato ESSI (${numDoc})` : `Formato FUA (${numDoc})`;
+  }
+  const btnMed = document.getElementById("btn_fua_essi_medico");
+  if (btnMed) {
+    btnMed.title = esEsSalud ? "Hoja de Atención de Emergencia EsSalud (ESSI)" : "Formato Único de Atención MINSA/SIS (FUA)";
+  }
+
+  const btnM8 = document.getElementById("btn_imprimir_formato_m8");
+  if (btnM8) {
+    btnM8.textContent = esEsSalud ? `📄 Imprimir ESSI Cerrado (${numDoc})` : `📄 Imprimir FUA Cerrado (${numDoc})`;
+    btnM8.title = esEsSalud ? "Liquidación y Cierre de Hoja ESSI EsSalud (Cero Copago)" : "Liquidación y Cierre de Formato FUA MINSA/SIS (100% Gratuidad)";
+  }
+}
+window.actualizarBotonesFormatoPublico = actualizarBotonesFormatoPublico;
+
+/**
+ * Despachador principal que detecta si el paciente activo pertenece a EsSalud o a MINSA/SIS
+ */
+function imprimirFormatoPublicoSegunRegimen() {
+  if (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD") {
+    imprimirFormatoESSI();
+  } else {
+    imprimirFormatoFUA();
+  }
+}
+window.imprimirFormatoPublicoSegunRegimen = imprimirFormatoPublicoSegunRegimen;
+
+/**
+ * Genera e imprime el FORMATO ÚNICO DE ATENCIÓN (FUA) Oficial de MINSA / SIS
+ * Normativa: R.J. N° 081-2014/SIS y modificatorias. Firma del paciente en blanco, firma digital simulada del personal de salud.
+ */
+function imprimirFormatoFUA() {
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permita las ventanas emergentes para imprimir el Formato FUA."); return; }
+
+  const nroFua = STATE.nroFua || "FUA-2026-" + Math.floor(100000 + Math.random() * 900000);
+  STATE.nroFua = nroFua;
+  const nomPx = STATE.nombreReniec || STATE.identificador || "PACIENTE DESCONOCIDO (NN)";
+  const dniPx = STATE.numDni || STATE.identificador || "POR REGISTRAR";
+  const hcPx = STATE.historiaClinica || "HC-PROVISIONAL";
+  const edadPx = (STATE.edad !== null && STATE.edad !== undefined) ? `${STATE.edad} años` : "Desconocida";
+  const sexoPx = (STATE.sexo === "F") ? "FEMENINO" : (STATE.sexo === "M") ? "MASCULINO" : "DESCONOCIDO";
+  const fechaHoy = new Date().toLocaleDateString("es-PE");
+  const horaHoy = new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  const prio = STATE.prioridad || "PENDIENTE";
+  const cie10 = STATE.diagnosticoCIE10 || STATE.cie10 || "R69 - CAUSAS DESCONOCIDAS DE MORBILIDAD";
+  const destino = STATE.camaAsignada || "SALA DE OBSERVACIÓN / TÓPICO DE EMERGENCIA";
+  const motivo = STATE.motivoConsulta || STATE.cedisCategoria || "Atención Médica de Emergencia";
+
+  w.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>FUA - Formato ÚNICO de Atención MINSA/SIS - ${nroFua}</title>
+      <style>
+        @page { size: portrait; margin: 8mm; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.25; margin: 0; padding: 10px; color: #0f172a; }
+        .fua-container { border: 2px solid #0f172a; padding: 8px; border-radius: 4px; max-width: 800px; margin: 0 auto; background: #fff; }
+        .fua-header { border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 6px; }
+        .fua-title-box { background: #0f172a; color: #fff; padding: 4px 8px; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 3px; margin: 6px 0 4px 0; }
+        .fua-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 9.5px; }
+        .fua-table th, .fua-table td { border: 1px solid #cbd5e1; padding: 3px 5px; text-align: left; }
+        .fua-table th { background: #f8fafc; font-weight: 700; color: #334155; }
+        .fua-box-firmas { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+        .fua-firma-card { flex: 1; border: 1px solid #94a3b8; border-radius: 4px; padding: 6px; text-align: center; min-height: 105px; display: flex; flex-direction: column; justify-content: space-between; }
+        @media print {
+          body { padding: 0; }
+          .fua-container { border: 1.5px solid #000; box-shadow: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="fua-container">
+        <!-- ENCABEZADO OFICIAL MINSA / SIS -->
+        <div class="fua-header">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 20%; vertical-align: middle;">
+                <div style="font-weight: 900; font-size: 12px; color: #dc2626;">MINSA</div>
+                <div style="font-size: 8px; color: #64748b;">Ministerio de Salud</div>
+              </td>
+              <td style="width: 55%; text-align: center; vertical-align: middle;">
+                <div style="font-weight: 900; font-size: 13px; color: #0f172a; letter-spacing: 0.5px;">FORMATO ÚNICO DE ATENCIÓN - FUA</div>
+                <div style="font-size: 8.5px; font-weight: 700; color: #0284c7;">SEGURO INTEGRAL DE SALUD (SIS) · FISSAL</div>
+                <div style="font-size: 7.5px; color: #64748b;">R.J. N° 081-2014/SIS · NTS N° 042-MINSA/DGSP · ATENCIÓN DE EMERGENCIA</div>
+              </td>
+              <td style="width: 25%; text-align: right; vertical-align: middle;">
+                <div style="border: 1.5px solid #dc2626; padding: 4px; border-radius: 4px; background: #fef2f2; display: inline-block; text-align: center;">
+                  <div style="font-size: 7px; font-weight: 800; color: #dc2626;">NÚMERO DE FUA</div>
+                  <div style="font-size: 11px; font-weight: 900; color: #991b1b; font-family: monospace;">${nroFua}</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+          <div style="display: flex; justify-content: space-between; font-size: 8px; color: #475569; margin-top: 4px; border-top: 1px dotted #cbd5e1; padding-top: 2px;">
+            <span><strong>IPRESS:</strong> 00014522 - HOSPITAL REGIONAL DOCENTE UPP</span>
+            <span><strong>DISA / GERESA:</strong> LIMA METROPOLITANA</span>
+            <span><strong>NIVEL:</strong> III-E ESPECIALIZADO</span>
+          </div>
+        </div>
+
+        <!-- I. DATOS DEL ASEGURADO -->
+        <div class="fua-title-box">I. DATOS DE FILIACIÓN DEL ASEGURADO</div>
+        <table class="fua-table">
+          <tr>
+            <th style="width: 15%;">Tipo Doc. Identidad:</th>
+            <td style="width: 35%;">DNI / CE: <strong>${dniPx}</strong></td>
+            <th style="width: 15%;">Historia Clínica:</th>
+            <td style="width: 35%;"><strong>${hcPx}</strong></td>
+          </tr>
+          <tr>
+            <th>Apellidos y Nombres:</th>
+            <td colspan="3"><strong style="font-size: 10px; color: #0f172a;">${nomPx}</strong></td>
+          </tr>
+          <tr>
+            <th>Edad / Sexo:</th>
+            <td>${edadPx} | ${sexoPx}</td>
+            <th>Régimen Aseguramiento:</th>
+            <td><strong style="color: #15803d;">SIS GRATUITO (SUBSIDIADO AL 100%)</strong></td>
+          </tr>
+          <tr>
+            <th>Fecha / Hora Ingreso:</th>
+            <td>${fechaHoy} a las ${horaHoy}</td>
+            <th>Modalidad Ingreso:</th>
+            <td>Emergencia / Triaje Rápido CTAS</td>
+          </tr>
+        </table>
+
+        <!-- II. MODIFICADORES TRIAJE CTAS (CANADÁ / MINSA) -->
+        <div class="fua-title-box">II. EVALUACIÓN DE TRIAJE CTAS / PAEDCTAS (NTS N° 042-MINSA)</div>
+        <table class="fua-table">
+          <tr>
+            <th style="width: 18%;">Nivel Prioridad CTAS:</th>
+            <td style="width: 32%;"><strong style="color: #dc2626; font-size: 10px;">PRIORIDAD P-${prio}</strong> (${prio === 1 ? 'Resucitación 0 min' : prio === 2 ? 'Emergencia ≤ 15 min' : prio === 3 ? 'Urgencia ≤ 30 min' : prio === 4 ? 'Urgencia Menor ≤ 60 min' : 'No Urgente ≤ 120 min'})</td>
+            <th style="width: 18%;">Categoría CEDIS / Motivo:</th>
+            <td style="width: 32%;">${motivo}</td>
+          </tr>
+        </table>
+        <table class="fua-table" style="text-align: center;">
+          <tr style="background: #f1f5f9; font-weight: 700; font-size: 8.5px;">
+            <td>FC (lpm)</td><td>FR (rpm)</td><td>PA (mmHg)</td><td>SpO2 (%)</td><td>Temp (°C)</td><td>Glasgow</td><td>Dolor (EVA)</td><td>Glucemia</td>
+          </tr>
+          <tr style="font-weight: 800; font-size: 9.5px; color: #0f172a;">
+            <td>${STATE.fc || '--'}</td>
+            <td>${STATE.fr || '--'}</td>
+            <td>${(STATE.pasSistolica && STATE.paDiastolica) ? STATE.pasSistolica + '/' + STATE.paDiastolica : '--'}</td>
+            <td>${STATE.spo2 || '--'}%</td>
+            <td>${STATE.temperatura || '--'} °C</td>
+            <td>${STATE.glasgow || '--'}/15</td>
+            <td>${STATE.eva || '--'}/10</td>
+            <td>${STATE.glucosa ? STATE.glucosa + ' mg/dL' : 'No requirió'}</td>
+          </tr>
+        </table>
+
+        <!-- III. ACTO MÉDICO Y DESTINO -->
+        <div class="fua-title-box">III. ATENCIÓN MÉDICA, DIAGNÓSTICO CIE-10 Y COBERTURA</div>
+        <table class="fua-table">
+          <tr>
+            <th style="width: 20%;">Diagnóstico Principal (CIE-10):</th>
+            <td colspan="3"><strong style="color: #0369a1; font-size: 10px;">${cie10}</strong></td>
+          </tr>
+          <tr>
+            <th>Ubicación / Cama Destino:</th>
+            <td><strong style="color: #15803d;">${destino}</strong></td>
+            <th>Médico Tratante:</th>
+            <td>${STATE.medicoTratante || "Dr. Carlos Mendoza Paredes (CMP 68421 - RNE 34512)"}</td>
+          </tr>
+          <tr>
+            <th>Liquidación SIS:</th>
+            <td colspan="3">
+              <strong style="color: #15803d;">COBERTURA 100% CUBIERTA POR EL SIS (PAGO CERO · S/. 0.00 COPAGO)</strong> — Garantía Financiera Ley N° 29414 y Ley N° 27604.
+            </td>
+          </tr>
+        </table>
+
+        <!-- IV. BASE LEGAL -->
+        <div style="font-size: 7.5px; color: #475569; border: 1px dotted #cbd5e1; padding: 4px; border-radius: 4px; margin-bottom: 6px; line-height: 1.3;">
+          <strong>BASE LEGAL:</strong> R.J. N° 081-2014/SIS, Ley General de Salud N° 26842, D.S. N° 007-2012-SA, NTS N° 139-MINSA (Gestión de Historias Clínicas) y Ley N° 29733 de Protección de Datos Personales. El contenido tiene valor legal para auditoría médico-financiera de SUSALUD y el SIS.
+        </div>
+
+        <!-- V. FIRMAS Y HUELLA -->
+        <div class="fua-box-firmas">
+          <div class="fua-firma-card" style="background: #ffffff;">
+            <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Asegurado / Apoderado</div>
+            <div style="height: 48px; border-bottom: 1.5px solid #0f172a; margin: 12px 10px 4px 10px;"></div>
+            <div>
+              <div style="font-size: 8.5px; font-weight: 700; color: #0f172a;">${nomPx}</div>
+              <div style="font-size: 7px; color: #64748b;">Firma Física del Paciente (En blanco — RENIEC no implementa firma digitalizada aún)</div>
+            </div>
+          </div>
+
+          <div class="fua-firma-card" style="width: 130px; flex: none; background: #ffffff;">
+            <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Huella Dactilar</div>
+            <div style="width: 50px; height: 50px; border: 1.5px dashed #94a3b8; border-radius: 4px; margin: 4px auto;"></div>
+            <div style="font-size: 7px; color: #64748b;">Índice Derecho (Toma Física)</div>
+          </div>
+
+          <div class="fua-firma-card" style="background: #f0fdf4; border-color: #86efac;">
+            <div style="font-size: 8px; font-weight: 800; color: #166534; text-transform: uppercase;">Médico Responsable / Auditor</div>
+            <div style="height: 42px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              <svg width="170" height="40" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 14 38 C 24 8, 40 44, 54 14 C 66 2, 80 36, 94 12 C 106 2, 118 30, 132 10 C 144 4, 160 26, 174 8 M 28 42 C 75 45, 125 40, 182 32" stroke="#15803d" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="180" cy="12" r="2.5" fill="#15803d"/>
+              </svg>
+            </div>
+            <div style="border-top: 1px solid #16a34a; padding-top: 3px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #166534;">DR. CARLOS MENDOZA PAREDES</div>
+              <div style="font-size: 7.5px; color: #334155;">CMP 68421 · RNE 34512 · Emergentología</div>
+              <div style="font-size: 7px; color: #15803d; font-weight: 700;">🔏 Firma Digital Válida · Ley N° 27269</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 250);
+}
+window.imprimirFormatoFUA = imprimirFormatoFUA;
+
+/**
+ * Genera e imprime la HOJA DE ATENCIÓN DE EMERGENCIA Y ACREDITACIÓN ESSI de EsSalud
+ * Normativa: Res. N° 458-GG-ESSALUD. Firma del paciente en blanco, firma digital simulada del personal de salud.
+ */
+function imprimirFormatoESSI() {
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permita las ventanas emergentes para imprimir la Hoja de Atención ESSI."); return; }
+
+  const nroEssi = STATE.nroEssi || "ESSI-2026-" + Math.floor(100000 + Math.random() * 900000);
+  STATE.nroEssi = nroEssi;
+  const nomPx = STATE.nombreReniec || STATE.identificador || "PACIENTE DESCONOCIDO (NN)";
+  const dniPx = STATE.numDni || STATE.identificador || "POR REGISTRAR";
+  const hcPx = STATE.historiaClinica || "HC-PROVISIONAL";
+  const edadPx = (STATE.edad !== null && STATE.edad !== undefined) ? `${STATE.edad} años` : "Desconocida";
+  const sexoPx = (STATE.sexo === "F") ? "FEMENINO" : (STATE.sexo === "M") ? "MASCULINO" : "DESCONOCIDO";
+  const fechaHoy = new Date().toLocaleDateString("es-PE");
+  const horaHoy = new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
+  const prio = STATE.prioridad || "PENDIENTE";
+  const cie10 = STATE.diagnosticoCIE10 || STATE.cie10 || "R69 - CAUSAS DESCONOCIDAS DE MORBILIDAD";
+  const destino = STATE.camaAsignada || "TÓPICO DE EMERGENCIA ADULTOS ESSALUD";
+  const motivo = STATE.motivoConsulta || STATE.cedisCategoria || "Atención Médica de Emergencia";
+  const autogenerado = (nomPx.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase() || "PAC") + (dniPx.slice(0, 5) || "99999") + "M001";
+
+  w.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>ESSI - Hoja de Atención de Emergencia EsSalud - ${nroEssi}</title>
+      <style>
+        @page { size: portrait; margin: 8mm; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.25; margin: 0; padding: 10px; color: #0f172a; }
+        .essi-container { border: 2px solid #0369a1; padding: 8px; border-radius: 4px; max-width: 800px; margin: 0 auto; background: #fff; }
+        .essi-header { border-bottom: 2px solid #0369a1; padding-bottom: 6px; margin-bottom: 6px; }
+        .essi-title-box { background: #0284c7; color: #fff; padding: 4px 8px; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-radius: 3px; margin: 6px 0 4px 0; }
+        .essi-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 9.5px; }
+        .essi-table th, .essi-table td { border: 1px solid #bae6fd; padding: 3px 5px; text-align: left; }
+        .essi-table th { background: #f0f9ff; font-weight: 700; color: #0369a1; }
+        .essi-box-firmas { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+        .essi-firma-card { flex: 1; border: 1px solid #7dd3fc; border-radius: 4px; padding: 6px; text-align: center; min-height: 105px; display: flex; flex-direction: column; justify-content: space-between; }
+        @media print {
+          body { padding: 0; }
+          .essi-container { border: 1.5px solid #0369a1; box-shadow: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="essi-container">
+        <!-- ENCABEZADO OFICIAL ESSALUD -->
+        <div class="essi-header">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="width: 20%; vertical-align: middle;">
+                <div style="font-weight: 900; font-size: 13px; color: #0284c7;">EsSalud</div>
+                <div style="font-size: 8px; color: #0369a1; font-weight: 700;">Seguro Social de Salud</div>
+              </td>
+              <td style="width: 55%; text-align: center; vertical-align: middle;">
+                <div style="font-weight: 900; font-size: 13px; color: #0369a1; letter-spacing: 0.5px;">HOJA DE ATENCIÓN DE EMERGENCIA Y ACREDITACIÓN ESSI</div>
+                <div style="font-size: 8.5px; font-weight: 700; color: #0c4a6e;">SISTEMA DE GESTIÓN HOSPITALARIA ESSI · SERVICIO DE EMERGENCIA</div>
+                <div style="font-size: 7.5px; color: #475569;">RESOLUCIÓN DE GERENCIA GENERAL N° 458-GG-ESSALUD · LEY N° 26790</div>
+              </td>
+              <td style="width: 25%; text-align: right; vertical-align: middle;">
+                <div style="border: 1.5px solid #0284c7; padding: 4px; border-radius: 4px; background: #f0f9ff; display: inline-block; text-align: center;">
+                  <div style="font-size: 7px; font-weight: 800; color: #0369a1;">NÚMERO ESSI</div>
+                  <div style="font-size: 11px; font-weight: 900; color: #075985; font-family: monospace;">${nroEssi}</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+          <div style="display: flex; justify-content: space-between; font-size: 8px; color: #475569; margin-top: 4px; border-top: 1px dotted #bae6fd; padding-top: 2px;">
+            <span><strong>CENTRO ASISTENCIAL:</strong> 00002104 - HOSPITAL NACIONAL GUILLERMO ALMENARA IRIGOYEN / UPP</span>
+            <span><strong>RED ASISTENCIAL:</strong> ALMENARA</span>
+            <span><strong>TIPO SEGURO:</strong> REGULAR (TITULAR / DERECHOHABIENTE)</span>
+          </div>
+        </div>
+
+        <!-- I. FILIACIÓN Y ACREDITACIÓN -->
+        <div class="essi-title-box">I. FILIACIÓN Y ACREDITACIÓN DEL ASEGURADO ESSALUD</div>
+        <table class="essi-table">
+          <tr>
+            <th style="width: 15%;">DNI / CE:</th>
+            <td style="width: 35%;"><strong>${dniPx}</strong></td>
+            <th style="width: 15%;">Autogenerado ESSI:</th>
+            <td style="width: 35%;"><strong style="color: #0369a1; font-family: monospace;">${autogenerado}</strong></td>
+          </tr>
+          <tr>
+            <th>Apellidos y Nombres:</th>
+            <td colspan="3"><strong style="font-size: 10px; color: #0f172a;">${nomPx}</strong></td>
+          </tr>
+          <tr>
+            <th>Edad / Sexo:</th>
+            <td>${edadPx} | ${sexoPx}</td>
+            <th>Estado Acreditación:</th>
+            <td><strong style="color: #15803d;">✔ ACREDITADO ACTIVO (VIGENTE)</strong></td>
+          </tr>
+          <tr>
+            <th>Historia Clínica:</th>
+            <td><strong>${hcPx}</strong></td>
+            <th>Fecha / Hora Ingreso:</th>
+            <td>${fechaHoy} a las ${horaHoy}</td>
+          </tr>
+        </table>
+
+        <!-- II. TRIAJE CTAS ESSALUD -->
+        <div class="essi-title-box">II. VALORACIÓN DE TRIAJE CTAS (DIRECTIVA ESSALUD)</div>
+        <table class="essi-table">
+          <tr>
+            <th style="width: 18%;">Nivel Prioridad CTAS:</th>
+            <td style="width: 32%;"><strong style="color: #0284c7; font-size: 10px;">PRIORIDAD P-${prio}</strong> (${prio === 1 ? 'Resucitación Inmediata' : prio === 2 ? 'Emergencia Severa ≤ 15m' : prio === 3 ? 'Urgencia ≤ 30m' : prio === 4 ? 'Urgencia Menor ≤ 60m' : 'No Urgente ≤ 120m'})</td>
+            <th style="width: 18%;">Motivo / Queja Principal:</th>
+            <td style="width: 32%;">${motivo}</td>
+          </tr>
+        </table>
+        <table class="essi-table" style="text-align: center;">
+          <tr style="background: #f0f9ff; font-weight: 700; font-size: 8.5px;">
+            <td>FC (lpm)</td><td>FR (rpm)</td><td>PA (mmHg)</td><td>SpO2 (%)</td><td>Temp (°C)</td><td>Glasgow</td><td>EVA Dolor</td><td>Glucosa Capilar</td>
+          </tr>
+          <tr style="font-weight: 800; font-size: 9.5px; color: #0f172a;">
+            <td>${STATE.fc || '--'}</td>
+            <td>${STATE.fr || '--'}</td>
+            <td>${(STATE.pasSistolica && STATE.paDiastolica) ? STATE.pasSistolica + '/' + STATE.paDiastolica : '--'}</td>
+            <td>${STATE.spo2 || '--'}%</td>
+            <td>${STATE.temperatura || '--'} °C</td>
+            <td>${STATE.glasgow || '--'}/15</td>
+            <td>${STATE.eva || '--'}/10</td>
+            <td>${STATE.glucosa ? STATE.glucosa + ' mg/dL' : 'No requerida'}</td>
+          </tr>
+        </table>
+
+        <!-- III. EVALUACIÓN MÉDICA ESSALUD -->
+        <div class="essi-title-box">III. ACTO MÉDICO DE EMERGENCIA Y COBERTURA INSTITUCIONAL</div>
+        <table class="essi-table">
+          <tr>
+            <th style="width: 20%;">Diagnóstico Clínico (CIE-10):</th>
+            <td colspan="3"><strong style="color: #0284c7; font-size: 10px;">${cie10}</strong></td>
+          </tr>
+          <tr>
+            <th>Ubicación Asignada:</th>
+            <td><strong style="color: #15803d;">${destino}</strong></td>
+            <th>Médico Tratante de Turno:</th>
+            <td>${STATE.medicoTratante || "Dra. Elena Ramos Morales (CMP 55198 - RNE 29014)"}</td>
+          </tr>
+          <tr>
+            <th>Liquidación EsSalud:</th>
+            <td colspan="3">
+              <strong style="color: #15803d;">COBERTURA INTEGRAL 100% PRESTACIONAL (CERO COPAGO · S/. 0.00)</strong> — D.L. N° 688 y Ley N° 26790. Sin costo para el asegurado titular.
+            </td>
+          </tr>
+        </table>
+
+        <!-- IV. BASE LEGAL -->
+        <div style="font-size: 7.5px; color: #475569; border: 1px dotted #bae6fd; padding: 4px; border-radius: 4px; margin-bottom: 6px; line-height: 1.3;">
+          <strong>NORMATIVA:</strong> Ley N° 26790 (Ley de Modernización de la Seguridad Social en Salud), D.S. N° 009-97-SA, Directiva N° 003-GG-ESSALUD-2018 (Normas para la Atención en los Servicios de Emergencia) y Ley N° 29733 de Protección de Datos Personales.
+        </div>
+
+        <!-- V. FIRMAS Y HUELLA -->
+        <div class="essi-box-firmas">
+          <div class="essi-firma-card" style="background: #ffffff;">
+            <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Asegurado / Titular EsSalud</div>
+            <div style="height: 48px; border-bottom: 1.5px solid #0f172a; margin: 12px 10px 4px 10px;"></div>
+            <div>
+              <div style="font-size: 8.5px; font-weight: 700; color: #0f172a;">${nomPx}</div>
+              <div style="font-size: 7px; color: #64748b;">Firma Física del Paciente (En blanco — RENIEC no implementa firma digitalizada aún)</div>
+            </div>
+          </div>
+
+          <div class="essi-firma-card" style="width: 130px; flex: none; background: #ffffff;">
+            <div style="font-size: 8px; font-weight: 700; color: #64748b; text-transform: uppercase;">Huella Dactilar</div>
+            <div style="width: 50px; height: 50px; border: 1.5px dashed #7dd3fc; border-radius: 4px; margin: 4px auto;"></div>
+            <div style="font-size: 7px; color: #64748b;">Índice Derecho (Toma Física)</div>
+          </div>
+
+          <div class="essi-firma-card" style="background: #f0f9ff; border-color: #7dd3fc;">
+            <div style="font-size: 8px; font-weight: 800; color: #0369a1; text-transform: uppercase;">Médico Asistencial EsSalud</div>
+            <div style="height: 42px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              <svg width="170" height="40" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M 12 36 C 22 10, 38 42, 52 16 C 64 4, 78 34, 92 14 C 104 4, 116 28, 130 12 C 142 6, 158 24, 172 10 M 26 40 C 72 43, 122 38, 178 30" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="176" cy="14" r="2.5" fill="#0284c7"/>
+              </svg>
+            </div>
+            <div style="border-top: 1px solid #0284c7; padding-top: 3px;">
+              <div style="font-size: 8.5px; font-weight: 800; color: #0369a1;">DRA. ELENA RAMOS MORALES</div>
+              <div style="font-size: 7.5px; color: #334155;">CMP 55198 · RNE 29014 · Medicina de Emergencias</div>
+              <div style="font-size: 7px; color: #0284c7; font-weight: 700;">🔏 Firma Digital Válida · Ley N° 27269</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 250);
+}
+window.imprimirFormatoESSI = imprimirFormatoESSI;

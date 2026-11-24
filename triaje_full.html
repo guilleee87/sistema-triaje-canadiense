@@ -2591,12 +2591,15 @@
 
       <!-- SUB-SELECTORES DINÁMICOS DE RÉGIMEN (MINSA / ESSALUD / PLAN PRIVADO) -->
       <div id="contenedor_subselectores_regimen" style="margin-bottom:12px; display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
-        <div id="subselector_ipress_publica" style="display:flex; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:6px 12px;">
+        <div id="subselector_ipress_publica" style="display:flex; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:6px 12px; flex-wrap:wrap;">
           <span style="font-size:0.75rem; font-weight:800; color:#0369a1;">🏛️ IPRESS Pública:</span>
           <select id="select_ipress_publica" class="input-full" style="max-width:340px; font-size:0.76rem; font-weight:700; padding:4px 8px;" onchange="cambiarIpressPublica(this.value)">
             <option value="MINSA" selected>MINSA (Sistema SIS — Documento: FUA)</option>
             <option value="ESSALUD">ESSALUD (Sistema ESSI — Documento: Hoja de Atención de Emergencia)</option>
           </select>
+          <button type="button" id="btn_ver_formato_publico" class="btn-full-secondary" style="font-size:0.74rem; font-weight:800; padding:4px 10px; background:#ffffff; color:#0369a1; border:1px solid #93c5fd; border-radius:6px; cursor:pointer;" onclick="imprimirFormatoPublicoSegunRegimen()" title="Generar y consultar documento prestacional oficial">
+            📄 Ver Documento FUA / ESSI
+          </button>
         </div>
 
         <div id="subselector_plan_privado" style="display:none; align-items:center; gap:8px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:6px 12px;">
@@ -2631,14 +2634,14 @@
 
 
     <!-- ======================================================================
-         TABLERO DE ATENCIÓN SIMULTÁNEA DE EMERGENCIAS & GESTIÓN DE CAOS
+         TABLERO DE ATENCIÓN Y COLA DE EMERGENCIAS
          Sustento: NTS N° 042-MINSA (Triaje por severidad clínica, no por llegada)
          ====================================================================== -->
     <section class="active-patients-panel" id="activePatientsPanel">
       <div class="active-patients-top-bar">
         <div style="display:flex; align-items:center; gap:8px;">
           <span class="widget-beacon-dot" style="display:inline-block; width:10px; height:10px; background:#16a34a; border-radius:50%; box-shadow:0 0 0 3px rgba(34,197,94,0.3);"></span>
-          <strong style="color:#0f172a; font-size:0.92rem;">TABLERO DE ATENCIÓN SIMULTÁNEA &amp; COLA DE EMERGENCIAS</strong>
+          <strong style="color:#0f172a; font-size:0.92rem;">Tablero de Atención y cola de emergencias</strong>
           <span class="badge-active-count" id="lbl_total_px_activos">1 Paciente en atención</span>
         </div>
         <div class="active-patients-btn-group">
@@ -2684,6 +2687,14 @@
       </div>
     </section>
 
+
+    <!-- ======================================================================
+         CARRUSEL SLIDE DE PACIENTES EN ESPERA PRE-TRIAJE (DOOR-TO-TRIAGE)
+         Sustento: NTS N° 042-MINSA, Ley N° 27408 (Atención Preferente) y CTAS
+         ====================================================================== -->
+    <div id="cockpit_pretriage_queue_wrapper" class="pretriage-queue-wrapper">
+      <!-- Se inyecta dinámicamente mediante renderizarCarruselPreTriaje() -->
+    </div>
 
     <!-- ======================================================================
          MÓDULO 1: ENFERMERÍA DE TRIAJE (PUERTA DE ENTRADA UNIVERSAL)
@@ -3749,6 +3760,9 @@
               </button>
               <button type="button" id="btn_protocolo_junta_medica" class="btn-full-secondary" style="border:1.5px solid #6366f1; color:#4338ca; padding:9px 18px; font-weight:800; display:flex; align-items:center; gap:6px;" onclick="ejecutarJuntaMedicaNTS139()">
                 <span>👥</span> <span>Junta Médica (NTS N° 139)</span>
+              </button>
+              <button type="button" id="btn_fua_essi_medico" class="btn-full-secondary" style="border:1.5px solid #059669; color:#047857; padding:9px 18px; font-weight:800; display:flex; align-items:center; gap:6px; background:#ecfdf5;" onclick="imprimirFormatoPublicoSegunRegimen()" title="Generar / Consultar FUA o ESSI clínico con diagnóstico CIE-10 y destino">
+                <span>📄</span> <span id="lbl_btn_fua_essi_medico">Formato FUA / ESSI Clínico</span>
               </button>
             </div>
           </div>
@@ -5253,6 +5267,9 @@
           <button type="button" class="btn-full-primary" style="flex:1; padding:14px; font-size:0.95rem; background:#16a34a;" onclick="grabarAtencionCompleta()">
             💾 Grabar Atención Completa y Sincronizar en la Nube (Supabase)
           </button>
+          <button type="button" class="btn-full-secondary" id="btn_imprimir_formato_m8" style="padding:14px 20px; font-weight:800; background:#f0f9ff; color:#0369a1; border-color:#bae6fd;" onclick="imprimirFormatoPublicoSegunRegimen()" title="Imprimir FUA o ESSI oficial cerrado">
+            📄 Imprimir FUA / ESSI Cerrado
+          </button>
           <button type="button" class="btn-full-secondary" style="padding:14px 20px;" onclick="imprimirBrazalete()">
             🏷️ Imprimir Brazalete Asistencial
           </button>
@@ -5433,6 +5450,22 @@
         <div id="audit_logs_table_container">
           <!-- Tabla inyectada por JS -->
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EXPEDIENTE CLÍNICO & TRAZABILIDAD INTEGRAL DEL PACIENTE (AL HACER CLIC EN EL TABLERO) -->
+  <div class="modal-hc-overlay" id="modal_detalle_trazabilidad_px" style="display:none; z-index:9999;">
+    <div class="modal-hc-container" style="max-width:850px; width:92%; border-radius:14px; overflow:hidden; box-shadow:0 12px 30px rgba(0,0,0,0.25);">
+      <div style="background:#0f172a; color:#ffffff; display:flex; justify-content:space-between; align-items:center; padding:14px 18px;">
+        <h3 style="margin:0; font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+          <span>📋</span>
+          <span id="mod_trazabilidad_title">Expediente Clínico &amp; Trazabilidad Integral</span>
+        </h3>
+        <button type="button" onclick="cerrarModalDetalleYTrazabilidad()" style="color:#ffffff; background:none; border:none; font-size:1.4rem; cursor:pointer;" aria-label="Cerrar">&times;</button>
+      </div>
+      <div id="modal_detalle_trazabilidad_body" style="padding:18px; max-height:75vh; overflow-y:auto; background:#ffffff;">
+        <!-- Inyectado dinámicamente por abrirModalDetalleYTrazabilidad(id) -->
       </div>
     </div>
   </div>

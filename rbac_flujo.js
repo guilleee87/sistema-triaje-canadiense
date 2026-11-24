@@ -646,94 +646,12 @@
 
   window.inyectarBandejaPostaClinica = inyectarBandejaPostaClinica;
   function inyectarBandejaPostaClinica() {
-    if (document.getElementById("bandeja_posta_container")) return;
-
-    const workspaceCenter = document.getElementById("cockpit_workspace_center");
-    const cardsWrapper = document.getElementById("activePatientsCardsList");
-    const parent = workspaceCenter || (cardsWrapper ? cardsWrapper.parentElement : document.querySelector("main"));
-    if (!parent) return;
-
-    const bandejaHtml = `
-      <section class="bandeja-posta-card" id="bandeja_posta_container">
-        
-        <!-- Cabecera de la Bandeja -->
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="font-size:1.15rem;">📮</span>
-            <div>
-              <strong style="font-size:0.92rem; color:#0f172a;">Bandeja de Posta Clínica en Tiempo Real</strong>
-              <div style="font-size:0.72rem; color:#64748b;">Flujo Asistencial Integrado · Ley N° 27604 (Emergencia Vital) &amp; NTS N° 139-MINSA</div>
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span id="badge_p1_urgente" style="display:none; background:#fee2e2; color:#b91c1c; border:1.5px solid #f87171; border-radius:9999px; font-size:0.72rem; font-weight:900; padding:3px 10px; animation:pulseAlert 1.5s infinite;">
-              🚨 ALERTA P-I: RIESGO VITAL ACTIVO
-            </span>
-            <button type="button" onclick="recargarColaCompartidaDesdeStorage()" class="btn-full-secondary" style="font-size:0.72rem; padding:4px 8px; border-radius:6px; cursor:pointer;" title="Sincronizar bandeja con otras pestañas">
-              🔄 Sincronizar
-            </button>
-          </div>
-        </div>
-
-        <!-- Pestañas de Estaciones / Estado de Flujo -->
-        <div class="bandeja-tabs-wrapper" id="bandeja_tabs_list">
-          <button type="button" class="bandeja-tab-btn active" data-estado="TODOS" onclick="filtrarBandejaPosta('TODOS')">
-            🌐 Todos (<span id="count_posta_todos">0</span>)
-          </button>
-          <button type="button" class="bandeja-tab-btn" data-estado="PENDIENTE_TRIAJE" onclick="filtrarBandejaPosta('PENDIENTE_TRIAJE')">
-            🩺 1. Triaje Pendiente (<span id="count_posta_triaje">0</span>)
-          </button>
-          <button type="button" class="bandeja-tab-btn" data-estado="ADMISION" onclick="filtrarBandejaPosta('ADMISION')">
-            📋 2. Admisión &amp; Seguros (<span id="count_posta_admision">0</span>)
-          </button>
-          <button type="button" class="bandeja-tab-btn" data-estado="EN_ATENCION_MEDICA" onclick="filtrarBandejaPosta('EN_ATENCION_MEDICA')">
-            👨‍⚕️ 3. Atención Médica (<span id="count_posta_medico">0</span>)
-          </button>
-          <button type="button" class="bandeja-tab-btn" data-estado="PENDIENTE_CAJA" onclick="filtrarBandejaPosta('PENDIENTE_CAJA')">
-            💳 4. Pendiente Caja (<span id="count_posta_caja">0</span>)
-          </button>
-          <button type="button" class="bandeja-tab-btn" data-estado="CERRADO_FACTURADO" onclick="filtrarBandejaPosta('CERRADO_FACTURADO')">
-            🏁 5. Cerrados (<span id="count_posta_cerrados">0</span>)
-          </button>
-        </div>
-
-        <!-- ED Track Board (Tablero Priorizado de Pacientes) -->
-        <div id="trackboard_pacientes_lista" style="display:flex; flex-direction:column; gap:6px; margin: 10px 0; max-height:220px; overflow-y:auto; padding-right:4px;">
-          <!-- Filas de expedientes renderizadas dinámicamente -->
-        </div>
-
-        <!-- Barra de Acción Posta del Paciente Activo -->
-        <div class="posta-action-bar" id="barra_accion_posta_activo">
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div style="font-size:0.84rem; color:#0f172a;">
-              Paciente Activo: <strong id="lbl_posta_px_nombre">—</strong> 
-              <span id="lbl_posta_px_dni" style="color:#64748b; font-size:0.75rem;">(Sin DNI)</span>
-            </div>
-            <span id="badge_posta_estado_actual" style="font-size:0.72rem; font-weight:800; padding:2px 8px; border-radius:4px; background:#e2e8f0; color:#334155;">
-              Por iniciar
-            </span>
-          </div>
-
-          <!-- Botonera de Transición de Posta según rol y estado -->
-          <div id="contenedor_botones_transicion_posta" style="display:flex; gap:8px; align-items:center;">
-            <!-- Inyectado dinámicamente -->
-          </div>
-        </div>
-
-        <!-- Estampas de Firmas de Auditoría del Paciente Activo -->
-        <div class="firmas-container" id="contenedor_firmas_selladas">
-          <!-- Inyectado dinámicamente -->
-        </div>
-
-      </section>
-    `;
-
-    if (cardsWrapper) {
-      cardsWrapper.parentElement.insertBefore(
-        document.createRange().createContextualFragment(bandejaHtml),
-        cardsWrapper
-      );
+    // Reemplazado formalmente por el Tablero de Atención y cola de emergencias (NTS N° 042-MINSA)
+    const existing = document.getElementById("bandeja_posta_container");
+    if (existing) {
+      existing.remove();
     }
+    return;
   }
 
   // ----------------------------------------------------------------------------
