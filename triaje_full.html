@@ -2426,6 +2426,16 @@
           <span>🧪 Sandbox</span>
         </a>
 
+        <!-- BOTÓN HISTORIA CLÍNICA (ACCESO DIRECTO UNIVERSAL) -->
+        <button type="button" id="btn_header_historia_clinica" onclick="abrirModalConsultaHC()" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-sky-600 text-white border border-sky-700 hover:bg-sky-700 transition-all cursor-pointer shadow-2xs" title="Consultar y visualizar la Historia Clínica completa de los pacientes">
+          <span>📋 Historia Clínica</span>
+        </button>
+
+        <!-- BOTÓN DEMO (REINICIA TODOS LOS FLUJOS A CERO) -->
+        <button type="button" id="btn_demo_reset_global" onclick="confirmarReinicioDemostracion()" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-600 text-white border border-amber-700 hover:bg-amber-700 transition-all cursor-pointer shadow-2xs" title="Reiniciar todos los flujos y datos del sistema a cero">
+          <span>🔄 Demo</span>
+        </button>
+
                 <!-- BOTÓN LOG AUDITORÍA SUSALUD -->
         <button type="button" id="btn_modal_audit_log" onclick="abrirModalAuditLogSusalud()" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all cursor-pointer" title="Ver Bitácora Inmutable de Auditoría SUSALUD (audit_logs)">
           <span>🛡️ Log SUSALUD</span>
@@ -2596,18 +2606,27 @@
           <select id="select_ipress_publica" class="input-full" style="max-width:340px; font-size:0.76rem; font-weight:700; padding:4px 8px;" onchange="cambiarIpressPublica(this.value)">
             <option value="MINSA" selected>MINSA (Sistema SIS — Documento: FUA)</option>
             <option value="ESSALUD">ESSALUD (Sistema ESSI — Documento: Hoja de Atención de Emergencia)</option>
+            <option value="PARTICULAR">Sin Seguro (Particular — Pago 100% Paciente)</option>
           </select>
           <button type="button" id="btn_ver_formato_publico" class="btn-full-secondary" style="font-size:0.74rem; font-weight:800; padding:4px 10px; background:#ffffff; color:#0369a1; border:1px solid #93c5fd; border-radius:6px; cursor:pointer;" onclick="imprimirFormatoPublicoSegunRegimen()" title="Generar y consultar documento prestacional oficial">
             📄 Ver Documento FUA / ESSI
           </button>
         </div>
 
-        <div id="subselector_plan_privado" style="display:none; align-items:center; gap:8px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:6px 12px;">
-          <span style="font-size:0.75rem; font-weight:800; color:#6d28d9;">🏥 Plan Privado / EPS:</span>
-          <select id="select_plan_privado" class="input-full" style="max-width:340px; font-size:0.76rem; font-weight:700; padding:4px 8px;" onchange="cambiarPlanPrivado(this.value)">
-            <option value="base_80_20" selected>Plan Base 80/20 + Deducible S/ 80</option>
-            <option value="integral_90_10">Plan Integral 90/10 + Deducible S/ 50</option>
-            <option value="vip_100">Plan VIP 100%</option>
+        <div id="subselector_plan_privado" style="display:none; align-items:center; gap:8px; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:8px; padding:6px 12px; flex-wrap:wrap;">
+          <span style="font-size:0.75rem; font-weight:800; color:#6d28d9;">🏥 Aseguradora / Plan Privado:</span>
+          <select id="select_aseguradora_privada" class="input-full" style="max-width:220px; font-size:0.76rem; font-weight:700; padding:4px 8px;" onchange="cambiarAseguradoraPrivada(this.value)">
+            <option value="Pacífico EPS" selected>Pacífico EPS</option>
+            <option value="Rímac EPS">Rímac EPS</option>
+            <option value="Mapfre EPS">Mapfre EPS</option>
+            <option value="La Positiva EPS">La Positiva EPS</option>
+            <option value="Sanitas EPS">Sanitas EPS</option>
+            <option value="Particular">Sin Seguro (Particular 100%)</option>
+          </select>
+          <select id="select_plan_privado" class="input-full" style="max-width:290px; font-size:0.76rem; font-weight:700; padding:4px 8px;" onchange="cambiarPlanPrivado(this.value)">
+            <option value="base_80_20" selected>Plan Base 80/20 + Copago/Deducible S/ 80</option>
+            <option value="integral_90_10">Plan Integral 90/10 + Copago S/ 50</option>
+            <option value="vip_100">Plan VIP 100% (Emerg. S/ 0 · Farm. 10%)</option>
           </select>
         </div>
       </div>
@@ -2666,19 +2685,39 @@
           <button type="button" class="btn-caos-action btn-newpx-action" onclick="registrarPacienteEnEspera()" title="Registrar llegada de paciente a sala de espera" style="background:#0284c7; color:#ffffff; border:none; font-weight:800;">
             ➕ Registrar Paciente en Espera
           </button>
-          <!-- BOTÓN DE REINICIO DE SIMULACIÓN Y DEMOSTRACIÓN CON SIGNO [!] -->
-          <button type="button" class="btn-caos-action btn-reset-demo" onclick="confirmarReinicioDemostracion()" title="⚠️ ATENCIÓN: Este botón existe únicamente para la simulación y demostración (Demo / Sandbox). Reinicia el sistema a cero y restablece las 15 camas libres." style="background:linear-gradient(135deg, #b45309 0%, #d97706 100%); color:#ffffff; font-weight:800; border:1.5px solid #92400e; box-shadow:0 2px 6px rgba(180,83,9,0.25);">
-            ⚠️! Reiniciar Todo a Cero [Demo]
-          </button>
           <!-- BOTÓN PARA CONSULTAR ATENCIONES DE DÍAS ANTERIORES -->
           <button type="button" class="btn-caos-action btn-historial-dias" onclick="abrirModalHistorialDiasAnteriores()" title="Consultar atenciones de días anteriores según NTS N° 139-MINSA" style="background:#0f172a; color:#ffffff; font-weight:800; border:1.5px solid #334155; box-shadow:0 2px 6px rgba(15,23,42,0.25);">
             📅 Atenciones Días Anteriores
           </button>
-          <!-- DESEMPATE ASIGNADO EXCLUSIVAMENTE AL MODO SIMULACIÓN SANDBOX -->
-          <button type="button" class="btn-caos-action btn-desempate-action" onclick="abrirModalLlegadasSimultaneasDesempate()" style="display:none !important;" title="Exclusivo de Simulación Sandbox">
+          <!-- BOTÓN DE DESEMPATE CLÍNICO -->
+          <button type="button" class="btn-caos-action btn-desempate-action" onclick="abrirModalLlegadasSimultaneasDesempate()" title="Protocolo de Desempate Clínico y Llegadas Simultáneas (ABCDE)">
             ⚖️ Desempate Llegadas Simultáneas
           </button>
         </div>
+      </div>
+
+      <!-- Barra de Filtros por Prioridad y Etapa del Flujo -->
+      <div id="tablero_filtros_bar" style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0 10px; padding:8px 10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+        <span style="font-size:0.74rem; font-weight:800; color:#475569;">🔎 Filtrar:</span>
+        <select id="filtro_tablero_prioridad" onchange="aplicarFiltrosTableroCola()" style="font-size:0.74rem; font-weight:700; padding:4px 8px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; color:#0f172a; cursor:pointer;" aria-label="Filtrar tablero por prioridad">
+          <option value="TODAS">Prioridad: Todas</option>
+          <option value="I">🔴 P-I (Reanimación)</option>
+          <option value="II">🟠 P-II (Emergencia)</option>
+          <option value="III">🟡 P-III (Urgencia)</option>
+          <option value="IV">🟢 P-IV (Menos urgente)</option>
+          <option value="V">🔵 P-V (No urgente)</option>
+          <option value="SIN_EVALUAR">⏳ Por Evaluar (Sin prioridad)</option>
+        </select>
+        <select id="filtro_tablero_flujo" onchange="aplicarFiltrosTableroCola()" style="font-size:0.74rem; font-weight:700; padding:4px 8px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; color:#0f172a; cursor:pointer;" aria-label="Filtrar tablero por etapa del flujo">
+          <option value="TODOS">Flujo: Todas las etapas</option>
+          <option value="PENDIENTE_TRIAJE">⏳ Triaje Pendiente</option>
+          <option value="ADMISION">📋 Admisión / Aseguramiento</option>
+          <option value="EN_ATENCION_MEDICA">👨‍⚕️ Atención Médica</option>
+          <option value="PENDIENTE_CAJA">💳 Pendiente Caja</option>
+        </select>
+        <button type="button" id="btn_limpiar_filtros_tablero" onclick="limpiarFiltrosTableroCola()" style="display:none; font-size:0.72rem; font-weight:700; padding:4px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#ffffff; color:#475569; cursor:pointer;">
+          ✕ Limpiar filtros
+        </button>
       </div>
 
       <!-- Carrusel de Pacientes en Curso -->
@@ -3727,9 +3766,17 @@
               <span>🪪</span>
               <span>Expediente del Paciente — Vista Asistencial (Solo Lectura):</span>
             </div>
-            <span id="m4_badge_sincronizado" style="font-size:0.72rem; padding:2px 10px; border-radius:9999px; background:#f0fdf4; color:#166534; font-weight:700; border:1px solid #bbf7d0;">
-              ✅ Validado por Admisión / Triaje (Solo Lectura Médico)
-            </span>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <button type="button" id="btn_consultar_hc_paciente_actual" onclick="verHistoriaClinicaPacienteActual()" style="font-size:0.74rem; padding:4px 10px; border-radius:6px; background:#0284c7; color:#ffffff; border:none; font-weight:800; cursor:pointer;" title="Consultar únicamente la Historia Clínica del paciente que se está atendiendo (NTS N° 139-MINSA / Ley N° 29414)">
+                📋 Consultar Historia Clínica de Este Paciente
+              </button>
+              <span id="m4_badge_sincronizado" style="font-size:0.72rem; padding:2px 10px; border-radius:9999px; background:#f0fdf4; color:#166534; font-weight:700; border:1px solid #bbf7d0;">
+                ✅ Validado por Admisión / Triaje (Solo Lectura Médico)
+              </span>
+            </div>
+          </div>
+          <div style="font-size:0.72rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:6px 10px; border-radius:4px; margin-bottom:10px; line-height:1.4;">
+            ⚖️ <strong>Momento sugerido por norma (NTS N° 139-MINSA · NTS N° 042-MINSA · Ley N° 29414 · Ley N° 30024 RENHICE):</strong> Se recomienda consultar la Historia Clínica única exclusivamente del paciente en atención en <strong>Admisión (Módulo 2)</strong> y en la <strong>Evaluación Médica (Módulo 4)</strong> para verificar alergias, antecedentes y episodios previos antes de prescribir (confidencialidad Ley N° 29733), sin demorar la emergencia vital (Ley N° 27604).
           </div>
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; background:var(--ct-surface-alt, #f8fafc); border:1px solid var(--ct-border, #e2e8f0); border-radius:8px; padding:12px;">
             <div>
@@ -3751,6 +3798,9 @@
               <div style="font-size:0.7rem; font-weight:800; color:var(--ct-text-muted, #64748b); text-transform:uppercase;">Historia Clínica</div>
               <div id="m4_disp_hc" style="font-size:0.9rem; font-weight:800; color:#0284c7;">—</div>
             </div>
+          </div>
+          <div id="m4_banner_identificacion_legal" style="display:none; margin-top:10px; padding:10px 12px; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:8px; font-size:0.78rem; color:#92400e; line-height:1.45;">
+            <strong>🟡 Pendiente de Identificación en Módulo 2 (Admisión / Regularización Diferida):</strong> Paciente sin identificación confirmada (NN consciente/inconsciente, pase directo a Shock Trauma o atención rápida). Conforme a la <strong>Ley N° 27604</strong>, <strong>NTS N° 042-MINSA</strong> y <strong>NTS N° 139-MINSA</strong>, la regularización de identidad queda derivada a Admisión (Módulo 2) y Trabajo Social/PNP, <strong>habilitando al 100% la atención médica de emergencia y el Kardex sin bloqueos</strong>.
           </div>
         </div>
 
@@ -3793,8 +3843,8 @@
                 <div style="font-size:0.75rem; color:#64748b;">Marco Legal: Ley General de Salud N° 26842 (Art. 4° y 15°), Ley N° 29414 y D.S. N° 027-2015-SA</div>
               </div>
             </div>
-            <span class="norma-tag" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:800; padding:3px 10px; border-radius:6px; font-size:0.75rem;">
-              ⚖️ Requisito Legal Obligatorio
+            <span id="badge_consentimiento_legal" class="norma-tag" style="background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; font-weight:800; padding:3px 10px; border-radius:6px; font-size:0.75rem;">
+              ⚖️ Obligatorio solo en Cirugía / Proc. Invasivo
             </span>
           </div>
 
@@ -3802,6 +3852,7 @@
             <div class="form-field" style="margin-bottom:0;">
               <label for="sel_condicion_consentimiento" style="font-weight:700;">Condición Legal y Régimen de Otorgamiento:</label>
               <select id="sel_condicion_consentimiento" class="input-full" onchange="actualizarCondicionConsentimiento(this.value)" style="font-weight:700;">
+                <option value="no_requerido_clinico">✅ No Requerido — Urgencia/Emergencia clínica sin cirugía ni proc. invasivo</option>
                 <option value="paciente_lucido" selected>✓ Paciente Lúcido y Consciente (≥18 años) — Otorga y firma por derecho propio</option>
                 <option value="representante_legal">👥 Representación Legal / Familiar Directo — Paciente menor o sensorio alterado</option>
                 <option value="exonerado_emergencia">⚡ Excepción Legal de Emergencia Vital (Art. 4° Ley N° 26842) — Inconsciente / Riesgo inminente</option>
@@ -3811,8 +3862,9 @@
 
             <div class="form-field" style="margin-bottom:0;">
               <label for="sel_procedimiento_consentimiento" style="font-weight:700;">Procedimiento / Intervención Sujeta a Consentimiento:</label>
-              <select id="sel_procedimiento_consentimiento" class="input-full" style="font-weight:700;">
-                <option value="Atención Médica y Reanimación en Shock Trauma / Tópico" selected>🩺 Atención Médica y Reanimación en Emergencia</option>
+              <select id="sel_procedimiento_consentimiento" class="input-full" onchange="actualizarProcedimientoConsentimiento(this.value)" style="font-weight:700;">
+                <option value="Atención Clínica / Urgencia sin Cirugía ni Procedimiento Invasivo">✅ Atención Clínica / Urgencia sin Cirugía ni Proc. Invasivo (No requiere escrito)</option>
+                <option value="Atención Médica y Reanimación en Shock Trauma / Tópico" selected>🩺 Atención Médica y Reanimación en Shock Trauma / Procedimiento de Emergencia</option>
                 <option value="Intervención Quirúrgica de Emergencia (SOP) y Laparotomía / Toracotomía">🔪 Intervención Quirúrgica de Emergencia (SOP)</option>
                 <option value="Intubación Orotraqueal y Soporte Ventilatorio Mecánico">🫁 Intubación Orotraqueal y Ventilación Mecánica Asistida</option>
                 <option value="Cateterismo Venoso Central (CVC) y Accesos Vasculares Mayores">💉 Cateterismo Venoso Central (CVC)</option>
@@ -3844,24 +3896,6 @@
               <input type="checkbox" id="chk_consentimiento_firmado" onchange="toggleConsentimientoFirmado(this.checked)" style="width:18px; height:18px; accent-color:#16a34a; cursor:pointer;">
               <span>📑 Se adjunta documento de Consentimiento debidamente firmado a la HC</span>
             </label>
-          </div>
-        </div>
-
-        <!-- TARJETA DE RESULTADO RENIEC EN MÓDULO 4 -->
-          <div id="m4_reniec_result_card"  style="display:none; margin-top:10px; padding:10px 14px; background:#f0fdf4; border:1.5px solid #86efac; border-radius:8px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              <div>
-                <span style="font-size:0.7rem; font-weight:800; color:#15803d; text-transform:uppercase;">PACIENTE ASIGNADO A SHOCK TRAUMA / TÓPICO:</span>
-                <div id="m4_disp_nombre" style="font-size:0.98rem; font-weight:900; color:#0f172a;">—</div>
-              </div>
-              <div style="display:flex; gap:12px; font-size:0.78rem; color:#334155; flex-wrap:wrap; align-items:center;">
-                <div><strong>DNI:</strong> <span id="m4_disp_dni">—</span></div>
-                <div><strong>Edad:</strong> <span id="m4_disp_edad">—</span></div>
-                <div><strong>Sexo:</strong> <span id="m4_disp_sexo">—</span></div>
-                <div><strong>Historia Clínica:</strong> <span id="m4_disp_hc" style="color:#0284c7; font-weight:800;">—</span></div>
-                <div id="m4_badge_sincronizado" style="padding:2px 8px; border-radius:4px; font-weight:800; font-size:0.75rem; background:#dcfce7; color:#15803d;">✅ Validado en RENIEC (Solo Lectura)</div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -4000,7 +4034,7 @@
               <div class="form-field" style="margin-bottom:0;">
                 <label for="select_farmacia_catalogo">Seleccionar Medicamento / Solución EV:</label>
                 <input type="search" id="buscar_farmacia_input" placeholder="🔍 Buscar medicamento por nombre o acción..." class="input-full" style="margin-bottom:6px; font-size:0.82rem; padding:6px 10px; border-radius:6px;" oninput="filtrarCatalogoFarmacia(this.value)">
-                <select id="select_farmacia_catalogo" class="input-full" style="font-weight:600;">
+                <select id="select_farmacia_catalogo" class="input-full" style="font-weight:600;" onchange="if(this.value) agregarMedicamentoAKardex()">
                   <option value="">Seleccione medicamento o solución de emergencia...</option>
                   
                   <optgroup label="💧 Soluciones y Fluidoterapia EV">
@@ -5322,12 +5356,13 @@
         <button type="button" onclick="cerrarModalConsultaHC()" style="background:none; border:none; color:#ffffff; font-size:1.4rem; cursor:pointer;">✕</button>
       </div>
       <div class="modal-hc-body">
-        <div style="display:flex; gap:10px; margin-bottom:12px;">
-          <input type="text" id="modal_search_hc_input" class="input-full" placeholder="Buscar por Apellidos, Nombres, DNI o N° de HC..." oninput="cargarTablaCatalogoHC(this.value)">
-          <button type="button" class="btn-full-secondary" onclick="cargarTablaCatalogoHC('')">🔄 Ver Todos</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+          <input type="text" id="modal_search_hc_input" class="input-full" style="flex:1; min-width:220px;" placeholder="Buscar por DNI (8 dígitos), Apellidos, Nombres o N° de HC..." oninput="cargarTablaCatalogoHC(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();cargarTablaCatalogoHC(this.value);}">
+          <button type="button" id="btn_buscar_hc_modal" class="btn-full-primary" style="background:#0284c7; padding:0 16px; font-weight:800; white-space:nowrap;" onclick="cargarTablaCatalogoHC(document.getElementById('modal_search_hc_input')?.value || '')">🔍 Buscar</button>
+          <button type="button" class="btn-full-secondary" onclick="if(document.getElementById('modal_search_hc_input')) document.getElementById('modal_search_hc_input').value=''; cargarTablaCatalogoHC('')">🔄 Ver Todos</button>
         </div>
         <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#64748b; margin-bottom:8px;">
-          <span>Registros sincronizados en tiempo real</span>
+          <span>Solo consulta y auditoría (haga clic en un paciente para abrir su expediente; no genera ingresos)</span>
           <strong id="modal_hc_total_count">0 registros</strong>
         </div>
         <div style="overflow-x:auto;">
@@ -5354,7 +5389,7 @@
 
   <!-- MODAL VISUALIZACIÓN DE EXPEDIENTE E HISTORIAL ACUMULATIVO -->
   <div class="modal-hc-overlay" id="modal_visualizar_hc" onclick="if(event.target===this)cerrarModalVisualizarHC()">
-    <div class="modal-hc-container" style="max-width: 900px; width: 95%;">
+    <div class="modal-hc-container" style="max-width: 1060px; width: 96%;">
       <div class="modal-hc-header">
         <div style="display:flex; align-items:center; gap:10px;">
           <span style="font-size:1.4rem;">👁️</span>
@@ -5371,7 +5406,6 @@
       <div style="padding:14px 22px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; gap:10px; align-items:center; flex-wrap:wrap;">
         <div style="display:flex; gap:8px;">
           <button type="button" class="btn-full-secondary" id="btn_modal_imprimir_hc">🖨️ Imprimir Ficha Oficial</button>
-          <button type="button" class="btn-full-primary" id="btn_modal_cargar_paciente" style="background:#16a34a;">✓ Cargar Paciente para Nueva Atención</button>
         </div>
         <button type="button" class="btn-full-secondary" onclick="cerrarModalVisualizarHC()">Cerrar</button>
       </div>
@@ -5905,8 +5939,18 @@
           </div>
         </div>
 
-        <!-- CONFIGURADOR DE CANTIDAD DE PACIENTES SIMULTÁNEOS -->
-        <div style="background:#eef2ff; border:1.5px solid #c7d2fe; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+        <!-- SELECTOR DE MODO EN DESEMPATE: DATOS PRECARGADOS vs INGRESAR DATOS -->
+        <div id="desempate_modo_selector" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+          <button type="button" id="btn_desempate_modo_precargados" class="btn-full-primary" style="flex:1; min-width:200px; background:#4f46e5; border-color:#4338ca; font-weight:800; padding:10px 14px;" onclick="cambiarModoDesempate('precargados')">
+            📋 Datos precargados
+          </button>
+          <button type="button" id="btn_desempate_modo_manual" class="btn-full-secondary" style="flex:1; min-width:200px; border:1.5px solid #6366f1; color:#4338ca; background:#ffffff; font-weight:800; padding:10px 14px;" onclick="cambiarModoDesempate('manual')">
+            ✍️ Ingresar datos
+          </button>
+        </div>
+
+        <!-- CONFIGURADOR DE CANTIDAD DE PACIENTES SIMULTÁNEOS (MODO PRECARGADOS) -->
+        <div id="box_desempate_precargados" style="background:#eef2ff; border:1.5px solid #c7d2fe; border-radius:10px; padding:12px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
           <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <label for="input_cant_px_simultaneos" style="font-size:0.85rem; font-weight:800; color:#1e1b4b;">
               ¿Cuántos pacientes están ingresando simultáneamente?
@@ -5919,6 +5963,95 @@
           <button type="button" class="btn-full-primary" style="background:#4f46e5; border-color:#4338ca; font-size:0.82rem; padding:8px 16px; font-weight:800;" onclick="generarPacientesLlegadaSimultanea()">
             👥 Cargar / Generar Pacientes en Disputa
           </button>
+        </div>
+
+        <!-- FORMULARIO MANUAL DE INGRESO DE PACIENTES (MODO INGRESAR DATOS) -->
+        <div id="box_desempate_ingreso_manual" style="display:none; background:#f8fafc; border:1.5px solid #c7d2fe; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <strong style="font-size:0.86rem; color:#1e1b4b;">✍️ Ingresar Paciente Manualmente para Desempate ABCDE:</strong>
+            <button type="button" class="btn-full-secondary" style="font-size:0.74rem; padding:4px 10px;" onclick="limpiarListaManualDesempate()">
+              🗑️ Limpiar Lista
+            </button>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:0.72rem; font-weight:700;">Nombre / Alias:</label>
+              <input type="text" id="des_man_nombre" class="input-full" placeholder="Ej. Luis Ramírez / NN-02" style="padding:5px 8px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700;">Edad (años):</label>
+              <input type="number" id="des_man_edad" class="input-full" value="40" min="0" max="115" style="padding:5px 8px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700;">Sexo:</label>
+              <select id="des_man_sexo" class="input-full" style="padding:5px 8px; font-size:0.8rem;">
+                <option value="M">Masculino (M)</option>
+                <option value="F">Femenino (F)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700;">Modalidad:</label>
+              <select id="des_man_modalidad" class="input-full" style="padding:5px 8px; font-size:0.8rem;">
+                <option value="Ambulancia">Ambulancia</option>
+                <option value="A pie">A pie</option>
+                <option value="Policía / Serenazgo">Policía / Serenazgo</option>
+                <option value="Particular">Particular</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.72rem; font-weight:700;">Prioridad CTAS:</label>
+              <select id="des_man_prioridad" class="input-full" style="padding:5px 8px; font-size:0.8rem; font-weight:700;">
+                <option value="I">P-I (Rojo)</option>
+                <option value="II" selected>P-II (Naranja)</option>
+                <option value="III">P-III (Amarillo)</option>
+                <option value="IV">P-IV (Verde)</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(95px, 1fr)); gap:8px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">SpO2 (%):</label>
+              <input type="number" id="des_man_spo2" class="input-full" value="94" min="0" max="100" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">FC (lpm):</label>
+              <input type="number" id="des_man_fc" class="input-full" value="110" min="0" max="280" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">PAS (mmHg):</label>
+              <input type="number" id="des_man_pas" class="input-full" value="100" min="0" max="300" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">PAD (mmHg):</label>
+              <input type="number" id="des_man_pad" class="input-full" value="65" min="0" max="200" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">FR (rpm):</label>
+              <input type="number" id="des_man_fr" class="input-full" value="22" min="0" max="80" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">Glasgow:</label>
+              <input type="number" id="des_man_glasgow" class="input-full" value="14" min="3" max="15" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+            <div>
+              <label style="font-size:0.70rem; font-weight:700;">EVA (0-10):</label>
+              <input type="number" id="des_man_eva" class="input-full" value="6" min="0" max="10" style="padding:5px 6px; font-size:0.8rem;">
+            </div>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:12px; flex:1;">
+              <input type="text" id="des_man_motivo" class="input-full" placeholder="Motivo clínico (ej. Dolor torácico, fractura expuesta, disnea...)" style="flex:1; min-width:220px; padding:6px 10px; font-size:0.8rem;">
+              <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:700; cursor:pointer;">
+                <input type="checkbox" id="des_man_gestante"> Gestante
+              </label>
+              <label style="display:flex; align-items:center; gap:4px; font-size:0.75rem; font-weight:700; cursor:pointer;">
+                <input type="checkbox" id="des_man_codigo"> Código Tiempo
+              </label>
+            </div>
+            <button type="button" id="btn_agregar_px_manual_desempate" class="btn-full-primary" style="background:#0284c7; padding:7px 14px; font-size:0.8rem; font-weight:800; white-space:nowrap;" onclick="agregarPacienteManualDesempate()">
+              ➕ Agregar a la Disputa
+            </button>
+          </div>
         </div>
 
         <!-- ALERTA DE SATURACIÓN O CONTINGENCIA -->
