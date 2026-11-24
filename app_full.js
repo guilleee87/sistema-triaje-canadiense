@@ -1737,13 +1737,13 @@ function visualizarHistoriaClinica(pacienteEncoded) {
             <div><span style="color:#64748b;font-weight:700;">Dolor EVA:</span> <strong>${sv.dolor || "0"}/10</strong></div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;font-size:0.8rem;color:#475569;">
-            <div>🏥 <strong>Cama / Destino:</strong> ${ep.cama_asignada || ep.destino_clinico || "Observación"}</div>
+            <div>🏥 <strong>Cama / Destino:</strong> ${ep.cama_asignada || ep.destino_clinico || "—"}</div>
             <div>🔬 <strong>Apoyo Diagnóstico:</strong> ${exms}</div>
             <div>💊 <strong>Farmacia:</strong> ${meds}</div>
             <div>💰 <strong>Facturación:</strong> <span style="font-weight:800;color:${totalPagar === "S/. 0.00" ? "#16a34a" : "#0284c7"};">${totalPagar}</span> (${cobBadge})</div>
             <div style="grid-column: 1 / -1;border-top:1px dashed #e2e8f0;padding-top:4px;margin-top:2px;font-size:0.75rem;color:#64748b;display:flex;justify-content:space-between;">
-              <span><strong>Estado al Egreso:</strong> ${ep.estado_salida || "En observación"}</span>
-              <span><strong>Responsable:</strong> ${ep.firmante || "Lic. Enfermería de Turno"}</span>
+              <span><strong>Estado al Egreso:</strong> ${ep.estado_salida || "—"}</span>
+              <span><strong>Responsable:</strong> ${ep.firmante || "—"}</span>
             </div>
           </div>
         </div>
@@ -1776,40 +1776,111 @@ function visualizarHistoriaClinica(pacienteEncoded) {
     : null;
   const esActivo = STATE && (STATE.historiaClinica === hc || STATE.numDni === ident || STATE.identificador === ident);
 
-  const enfTriaje = master.enfermera_triaje || pxCola?.firmas?.triaje?.usuario || (esActivo ? STATE.enfermeraTriaje : "") || "Lic. Enfermería de Triaje";
-  const enfAsist = master.enfermera_asistencial || pxCola?.firmas?.enfermeria?.usuario || (esActivo ? STATE.enfermeraAsistencial : "") || "Lic. Enfermería Asistencial / Kardex";
-  const medTrat = master.medico_tratante || pxCola?.firmas?.medico?.usuario || (esActivo ? (STATE.medicoTratante || document.getElementById("medico_responsable_select")?.value) : "") || "Médico de Guardia Emergencia";
-  const admisionista = master.admisionista || pxCola?.firmas?.admision?.usuario || "Personal de Admisión";
-  const formaLlegada = master.forma_llegada || pxCola?.formaLlegada || (esActivo ? STATE.formaLlegada : "") || "Ingreso por Emergencia";
+  const enfTriaje = master.enfermera_triaje || pxCola?.firmas?.triaje?.usuario || (esActivo && STATE.enfermeraTriaje ? STATE.enfermeraTriaje : "") || "—";
+  const enfAsist = master.enfermera_asistencial || pxCola?.firmas?.enfermeria?.usuario || (esActivo && STATE.enfermeraAsistencial ? STATE.enfermeraAsistencial : "") || "—";
+  const medTrat = master.medico_tratante || pxCola?.firmas?.medico?.usuario || (esActivo && STATE.medicoTratante ? STATE.medicoTratante : "") || "—";
+  const admisionista = master.admisionista || pxCola?.firmas?.admision?.usuario || (esActivo && STATE.admisionista ? STATE.admisionista : "") || "—";
+  const formaLlegada = master.forma_llegada || pxCola?.formaLlegada || (esActivo ? STATE.formaLlegada : "") || "—";
   const fechaNac = master.fecha_nacimiento || (esActivo ? STATE.fechaNacimiento : "") || "—";
   const direccion = master.direccion || (esActivo ? STATE.direccion : "") || "—";
   const telefono = master.telefono || (esActivo ? STATE.telefono : "") || "—";
   const contactoEmerg = master.contacto_emergencia || "—";
-  const antPersonales = master.antecedentes_personales || "Sin antecedentes patológicos registrados";
-  const antFamiliares = master.antecedentes_familiares || "Sin antecedentes familiares consignados";
-  const medHabitual = master.medicacion_habitual || "Ninguna referida";
+  const antPersonales = master.antecedentes_personales || "—";
+  const antFamiliares = master.antecedentes_familiares || "—";
+  const medHabitual = master.medicacion_habitual || "—";
 
-  const labConsolidado = master.resultados_laboratorio || (esActivo && Array.isArray(STATE.ordenesLaboratorio) && STATE.ordenesLaboratorio.length > 0 ? STATE.ordenesLaboratorio.map(l => `${l.nombre} (${l.resultado || l.estado || "Solicitado"})`).join(" | ") : "Sin análisis de laboratorio registrados");
-  const imgConsolidado = master.resultados_imagenes || (esActivo && Array.isArray(STATE.ordenesImagenes) && STATE.ordenesImagenes.length > 0 ? STATE.ordenesImagenes.map(im => `${im.nombre} (${im.informe || im.estado || "Solicitado"})`).join(" | ") : "Sin estudios de imágenes registrados");
-  const kardexConsolidado = master.kardex_medicamentos || (esActivo && Array.isArray(STATE.kardexItems) && STATE.kardexItems.length > 0 ? STATE.kardexItems.map(k => `${k.nombre} ${k.dosis || ""} (${k.via || "EV"} · ${k.hora || "STAT"})`).join(" | ") : "Sin administración en Kardex");
-  const notasEnfConsolidado = master.notas_enfermeria || "Control de funciones vitales, vigilancia clínica y cumplimiento de indicaciones médicas.";
+  const labConsolidado = master.resultados_laboratorio || (esActivo && Array.isArray(STATE.ordenesLaboratorio) && STATE.ordenesLaboratorio.length > 0 ? STATE.ordenesLaboratorio.map(l => `${l.nombre} (${l.resultado || l.estado || "Solicitado"})`).join(" | ") : "—");
+  const imgConsolidado = master.resultados_imagenes || (esActivo && Array.isArray(STATE.ordenesImagenes) && STATE.ordenesImagenes.length > 0 ? STATE.ordenesImagenes.map(im => `${im.nombre} (${im.informe || im.estado || "Solicitado"})`).join(" | ") : "—");
+  const kardexConsolidado = master.kardex_medicamentos || (esActivo && Array.isArray(STATE.kardexItems) && STATE.kardexItems.length > 0 ? STATE.kardexItems.map(k => `${k.nombre} ${k.dosis || ""} (${k.via || "EV"} · ${k.hora || "STAT"})`).join(" | ") : "—");
+  const notasEnfConsolidado = master.notas_enfermeria || "—";
 
   const consultasExt = Array.isArray(master.consultas_externas) ? master.consultas_externas : [];
   const htmlConsultasExt = consultasExt.length > 0
     ? consultasExt.map((ce, idxCe) => `
         <div style="background:#ffffff;border:1px solid #cbd5e1;border-left:4px solid #6366f1;border-radius:8px;padding:8px 12px;margin-bottom:6px;font-size:0.78rem;">
           <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;">
-            <strong style="color:#312e81;">Consulta Externa #${consultasExt.length - idxCe} — ${ce.especialidad || "Medicina General"}</strong>
+            <strong style="color:#312e81;">Consulta Externa #${consultasExt.length - idxCe} — ${ce.especialidad || "—"}</strong>
             <span style="color:#475569;font-family:monospace;">📅 ${ce.fecha || "—"} · ⏱️ ${ce.hora || "—"}</span>
           </div>
-          <div style="color:#334155;margin-top:3px;"><strong>Médico:</strong> ${ce.medico || "Médico Consultor"} · <strong>Detalle/CIE-10:</strong> ${ce.detalle || "—"}</div>
+          <div style="color:#334155;margin-top:3px;"><strong>Médico:</strong> ${ce.medico || "—"} · <strong>Detalle/CIE-10:</strong> ${ce.detalle || "—"}</div>
         </div>
       `).join("")
-    : `<div style="font-size:0.78rem;color:#64748b;padding:8px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">Sin consultas externas previas registradas en el establecimiento.</div>`;
+    : `<div style="font-size:0.78rem;color:#94a3b8;padding:8px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">— (Sin atenciones en Consulta Externa)</div>`;
 
   const camposPersonalizados = master.campos_personalizados && typeof master.campos_personalizados === "object"
     ? Object.entries(master.campos_personalizados).map(([ck, cv]) => `<div><strong>${ck}:</strong> ${cv}</div>`).join("")
     : "";
+
+  const esRolAuditor = (typeof rolActivoActual !== "undefined" ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN")) === "ADMIN";
+  const bloqueFormularioAuditor = esRolAuditor ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+        <h4 style="margin:0;font-size:0.9rem;font-weight:900;color:#92400e;">✏️ Modificación Auditada de Cualquier Campo (Solo Auditor)</h4>
+        <span style="font-size:0.72rem;color:#b45309;font-weight:700;">Trazabilidad: Nombre · IP de la PC · Día · Hora · Valor Anterior → Nuevo</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin-bottom:10px;">
+        <div>
+          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nombre del Auditor que modifica:</label>
+          <input type="text" id="hc_audit_nombre_editor" class="input-full" placeholder="Ej. Dr. Juan Pérez (Auditor)" style="font-size:0.8rem;padding:6px 8px;">
+        </div>
+        <div>
+          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Campo de la Historia a modificar:</label>
+          <select id="hc_audit_campo" class="input-full" style="font-size:0.8rem;padding:6px 8px;" onchange="const c=document.getElementById('hc_audit_custom_wrap'); if(c) c.style.display=(this.value==='campo_personalizado')?'block':'none';">
+            <optgroup label="Filiación y Seguro">
+              <option value="nombre_completo">Nombre Completo</option>
+              <option value="identificador">DNI / Identificador</option>
+              <option value="edad">Edad</option>
+              <option value="sexo">Sexo (M / F)</option>
+              <option value="fecha_nacimiento">Fecha de Nacimiento</option>
+              <option value="direccion">Dirección</option>
+              <option value="telefono">Teléfono</option>
+              <option value="contacto_emergencia">Contacto de Emergencia</option>
+              <option value="tipo_seguro">Seguro / IAFAS</option>
+              <option value="forma_llegada">Forma de Llegada / Ingreso</option>
+            </optgroup>
+            <optgroup label="Alergias y Antecedentes">
+              <option value="alergias">Alergias Medicamentosas</option>
+              <option value="antecedentes_personales">Antecedentes Personales / Patológicos</option>
+              <option value="antecedentes_familiares">Antecedentes Familiares</option>
+              <option value="medicacion_habitual">Medicación Habitual</option>
+            </optgroup>
+            <optgroup label="Equipo Asistencial (Enfermeras / Médicos)">
+              <option value="enfermera_triaje">Enfermera(o) de Triaje</option>
+              <option value="enfermera_asistencial">Enfermera(o) Asistencial / Kardex</option>
+              <option value="medico_tratante">Médico Tratante</option>
+              <option value="admisionista">Personal de Admisión</option>
+            </optgroup>
+            <optgroup label="Resultados, Análisis, Imágenes y Consultas">
+              <option value="resultados_laboratorio">Resultados de Laboratorio</option>
+              <option value="resultados_imagenes">Resultados / Informes de Imágenes</option>
+              <option value="kardex_medicamentos">Kardex / Medicamentos</option>
+              <option value="notas_enfermeria">Notas de Enfermería</option>
+              <option value="consulta_externa_nueva">Agregar Consulta Externa</option>
+              <option value="nota_auditoria">Nota / Aclaración de Auditoría</option>
+              <option value="campo_personalizado">✏️ Otro Campo (Escribir nombre libre)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div id="hc_audit_custom_wrap" style="display:none;">
+          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nombre del campo personalizado:</label>
+          <input type="text" id="hc_audit_campo_custom" class="input-full" placeholder="Ej. Grupo Sanguíneo, Glasgow..." style="font-size:0.8rem;padding:6px 8px;">
+        </div>
+        <div>
+          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nuevo valor / Observación:</label>
+          <input type="text" id="hc_audit_valor" class="input-full" placeholder="Ingrese nuevo valor o detalle..." style="font-size:0.8rem;padding:6px 8px;">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+        <button type="button" id="btn_hc_audit_guardar" class="btn-full-primary" style="background:#b45309;padding:7px 14px;font-size:0.78rem;font-weight:800;"
+          onclick="registrarModificacionAuditorHC('${identEsc}','${hcEsc}','${nomEsc}','${segEsc}')">
+          💾 Registrar Modificación Auditada
+        </button>
+      </div>
+  ` : `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+        <h4 style="margin:0;font-size:0.88rem;font-weight:900;color:#92400e;">🛡️ Bitácora de Modificaciones de Auditoría (Solo Lectura — Rol Médico)</h4>
+        <span style="font-size:0.72rem;color:#b45309;font-weight:700;">La edición directa de registros archivados corresponde exclusivamente al Rol Auditor</span>
+      </div>
+  `;
 
   body.innerHTML = `
     <!-- 1. FILIACIÓN COMPLETA E IDENTIFICACIÓN (NTS N° 139-MINSA / HL7 PATIENT) -->
@@ -1900,68 +1971,7 @@ function visualizarHistoriaClinica(pacienteEncoded) {
 
     <!-- 7. AUDITORÍA UNIVERSAL: MODIFICAR CUALQUIER CAMPO CON TRAZABILIDAD (NOMBRE, IP, DÍA, HORA, ANTES -> DESPUÉS) -->
     <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
-        <h4 style="margin:0;font-size:0.9rem;font-weight:900;color:#92400e;">✏️ Modificación Auditada de Cualquier Campo (Solo Auditor)</h4>
-        <span style="font-size:0.72rem;color:#b45309;font-weight:700;">Trazabilidad: Nombre · IP de la PC · Día · Hora · Valor Anterior → Nuevo</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px;margin-bottom:10px;">
-        <div>
-          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nombre del Auditor que modifica:</label>
-          <input type="text" id="hc_audit_nombre_editor" class="input-full" placeholder="Ej. Dr. Juan Pérez (Auditor)" style="font-size:0.8rem;padding:6px 8px;">
-        </div>
-        <div>
-          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Campo de la Historia a modificar:</label>
-          <select id="hc_audit_campo" class="input-full" style="font-size:0.8rem;padding:6px 8px;" onchange="const c=document.getElementById('hc_audit_custom_wrap'); if(c) c.style.display=(this.value==='campo_personalizado')?'block':'none';">
-            <optgroup label="Filiación y Seguro">
-              <option value="nombre_completo">Nombre Completo</option>
-              <option value="identificador">DNI / Identificador</option>
-              <option value="edad">Edad</option>
-              <option value="sexo">Sexo (M / F)</option>
-              <option value="fecha_nacimiento">Fecha de Nacimiento</option>
-              <option value="direccion">Dirección</option>
-              <option value="telefono">Teléfono</option>
-              <option value="contacto_emergencia">Contacto de Emergencia</option>
-              <option value="tipo_seguro">Seguro / IAFAS</option>
-              <option value="forma_llegada">Forma de Llegada / Ingreso</option>
-            </optgroup>
-            <optgroup label="Alergias y Antecedentes">
-              <option value="alergias">Alergias Medicamentosas</option>
-              <option value="antecedentes_personales">Antecedentes Personales / Patológicos</option>
-              <option value="antecedentes_familiares">Antecedentes Familiares</option>
-              <option value="medicacion_habitual">Medicación Habitual</option>
-            </optgroup>
-            <optgroup label="Equipo Asistencial (Enfermeras / Médicos)">
-              <option value="enfermera_triaje">Enfermera(o) de Triaje</option>
-              <option value="enfermera_asistencial">Enfermera(o) Asistencial / Kardex</option>
-              <option value="medico_tratante">Médico Tratante</option>
-              <option value="admisionista">Personal de Admisión</option>
-            </optgroup>
-            <optgroup label="Resultados, Análisis, Imágenes y Consultas">
-              <option value="resultados_laboratorio">Resultados de Laboratorio</option>
-              <option value="resultados_imagenes">Resultados / Informes de Imágenes</option>
-              <option value="kardex_medicamentos">Kardex / Medicamentos</option>
-              <option value="notas_enfermeria">Notas de Enfermería</option>
-              <option value="consulta_externa_nueva">Agregar Consulta Externa</option>
-              <option value="nota_auditoria">Nota / Aclaración de Auditoría</option>
-              <option value="campo_personalizado">✏️ Otro Campo (Escribir nombre libre)</option>
-            </optgroup>
-          </select>
-        </div>
-        <div id="hc_audit_custom_wrap" style="display:none;">
-          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nombre del campo personalizado:</label>
-          <input type="text" id="hc_audit_campo_custom" class="input-full" placeholder="Ej. Grupo Sanguíneo, Glasgow..." style="font-size:0.8rem;padding:6px 8px;">
-        </div>
-        <div>
-          <label style="font-size:0.74rem;font-weight:700;color:#78350f;display:block;margin-bottom:3px;">Nuevo valor / Observación:</label>
-          <input type="text" id="hc_audit_valor" class="input-full" placeholder="Ingrese nuevo valor o detalle..." style="font-size:0.8rem;padding:6px 8px;">
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
-        <button type="button" id="btn_hc_audit_guardar" class="btn-full-primary" style="background:#b45309;padding:7px 14px;font-size:0.78rem;font-weight:800;"
-          onclick="registrarModificacionAuditorHC('${identEsc}','${hcEsc}','${nomEsc}','${segEsc}')">
-          💾 Registrar Modificación Auditada
-        </button>
-      </div>
+      ${bloqueFormularioAuditor}
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:0.73rem;background:#ffffff;border:1px solid #fde68a;border-radius:6px;">
           <thead>
@@ -2148,25 +2158,92 @@ async function registrarModificacionAuditorHC(ident, hc, nom, seg) {
   });
 }
 window.registrarModificacionAuditorHC = registrarModificacionAuditorHC;
-function imprimirFichaHistoriaClinica(pacienteEncoded) {
+function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
   let p;
   try {
     p = typeof pacienteEncoded === "string" ? JSON.parse(decodeURIComponent(pacienteEncoded)) : pacienteEncoded;
   } catch (e) {
     p = pacienteEncoded;
   }
-  if (!p) return;
+  if (!p) return "";
   const ident = p.identificador || "—";
   const nom = p.nombre_completo || ident;
   const hc = p.historia_clinica || "—";
   const master = obtenerOInicializarPacienteMaster(ident, hc, nom, p.tipo_seguro);
-  const seguro = master.tipo_seguro || p.tipo_seguro || "EsSalud / SIS / Particular";
-  const alergias = master.alergias || p.alergias || "Niega alergias medicamentosas conocidas";
+  const seguro = master.tipo_seguro || p.tipo_seguro || "—";
+  const alergias = master.alergias || p.alergias || "—";
   const episodios = obtenerEpisodiosDePaciente(ident, hc);
-  const esAlergico = alergias && !alergias.toLowerCase().includes("niega") && !alergias.toLowerCase().includes("ninguna");
+  const esAlergico = alergias && alergias !== "—" && !alergias.toLowerCase().includes("niega") && !alergias.toLowerCase().includes("ninguna");
+
+  const pxCola = (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA))
+    ? PACIENTES_COLA.find(x => (x.historiaClinica === hc || x.dni === ident || x.identificador === ident))
+    : null;
+  const esActivo = typeof STATE !== "undefined" && STATE && (STATE.historiaClinica === hc || STATE.numDni === ident || STATE.identificador === ident);
+
+  const enfTriaje = master.enfermera_triaje || pxCola?.firmas?.triaje?.usuario || (esActivo && STATE.enfermeraTriaje ? STATE.enfermeraTriaje : "") || "—";
+  const enfAsist = master.enfermera_asistencial || pxCola?.firmas?.enfermeria?.usuario || (esActivo && STATE.enfermeraAsistencial ? STATE.enfermeraAsistencial : "") || "—";
+  const medTrat = master.medico_tratante || pxCola?.firmas?.medico?.usuario || (esActivo && STATE.medicoTratante ? STATE.medicoTratante : "") || "—";
+  const admisionista = master.admisionista || pxCola?.firmas?.admision?.usuario || (esActivo && STATE.admisionista ? STATE.admisionista : "") || "—";
+  const formaLlegada = master.forma_llegada || pxCola?.formaLlegada || (esActivo ? STATE.formaLlegada : "") || "—";
+  const fechaNac = master.fecha_nacimiento || (esActivo ? STATE.fechaNacimiento : "") || "—";
+  const direccion = master.direccion || (esActivo ? STATE.direccion : "") || "—";
+  const telefono = master.telefono || (esActivo ? STATE.telefono : "") || "—";
+  const contactoEmerg = master.contacto_emergencia || "—";
+  const antPersonales = master.antecedentes_personales || "—";
+  const antFamiliares = master.antecedentes_familiares || "—";
+  const medHabitual = master.medicacion_habitual || "—";
+
+  const labConsolidado = master.resultados_laboratorio || (esActivo && Array.isArray(STATE.ordenesLaboratorio) && STATE.ordenesLaboratorio.length > 0 ? STATE.ordenesLaboratorio.map(l => `${l.nombre} (${l.resultado || l.estado || "Solicitado"})`).join(" | ") : "—");
+  const imgConsolidado = master.resultados_imagenes || (esActivo && Array.isArray(STATE.ordenesImagenes) && STATE.ordenesImagenes.length > 0 ? STATE.ordenesImagenes.map(im => `${im.nombre} (${im.informe || im.estado || "Solicitado"})`).join(" | ") : "—");
+  const kardexConsolidado = master.kardex_medicamentos || (esActivo && Array.isArray(STATE.kardexItems) && STATE.kardexItems.length > 0 ? STATE.kardexItems.map(k => `${k.nombre} ${k.dosis || ""} (${k.via || "EV"} · ${k.hora || "STAT"})`).join(" | ") : "—");
+  const notasEnfConsolidado = master.notas_enfermeria || "—";
+
+  const consultasExt = Array.isArray(master.consultas_externas) ? master.consultas_externas : [];
+  const filasConsultasExt = consultasExt.length > 0
+    ? consultasExt.map((ce, idxCe) => `
+        <tr>
+          <td>#${consultasExt.length - idxCe}</td>
+          <td>${ce.fecha || "—"}<br><span style="font-size:10px;color:#64748b;">${ce.hora || "—"}</span></td>
+          <td>${ce.especialidad || "—"}</td>
+          <td>${ce.medico || "—"}</td>
+          <td>${ce.detalle || "—"}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">— (Sin atenciones en Consulta Externa)</td></tr>`;
+
+  const camposPersonalizadosHtml = master.campos_personalizados && typeof master.campos_personalizados === "object"
+    ? Object.entries(master.campos_personalizados).map(([ck, cv]) => `<div class="field"><label>${ck}</label><span>${cv}</span></div>`).join("")
+    : "";
+
   let filasHtml = "";
-  if (episodios.length === 0) {
-    filasHtml = `<tr><td colspan="7" style="text-align:center;padding:16px;color:#64748b;">Expediente sin atenciones de emergencia previas registradas.</td></tr>`;
+  const epCurso = master.ultimo_episodio || (esActivo && STATE.historiaClinica === hc ? {
+    fecha_hora_texto: new Date().toLocaleString("es-PE"),
+    folio: "EN CURSO",
+    prioridad: STATE.prioridad ? `P-${STATE.prioridad}` : "—",
+    motivo_consulta: STATE.motivoConsulta || "—",
+    cama_asignada: STATE.camaAsignada || "—",
+    signos_vitales: { spo2: STATE.spo2, fc: STATE.fc, fr: STATE.fr, pa: `${STATE.pasSistolica || "—"}/${STATE.paDiastolica || "—"}`, temp: STATE.temperatura },
+    tipo_seguro: seguro
+  } : null);
+
+  if (epCurso) {
+    const svC = epCurso.signos_vitales || {};
+    const vitalsC = `SpO2 ${svC.spo2 || "—"}% | FC ${svC.fc || "—"} | PA ${svC.pa || "—"} | T° ${svC.temp || "—"}°C`;
+    filasHtml += `
+      <tr style="background:#f0f9ff;">
+        <td style="font-weight:800;color:#0369a1;">EN CURSO<br><code style="font-size:10px;">${epCurso.folio || hc}</code></td>
+        <td>${epCurso.fecha_hora_texto || "—"}</td>
+        <td style="font-weight:800;color:#0284c7;">${epCurso.prioridad || "—"}</td>
+        <td>${epCurso.motivo_consulta || "—"}</td>
+        <td style="font-size:11px;">${vitalsC}</td>
+        <td>${epCurso.cama_asignada || "—"}</td>
+        <td>—</td>
+      </tr>
+    `;
+  }
+
+  if (episodios.length === 0 && !epCurso) {
+    filasHtml = `<tr><td colspan="7" style="text-align:center;padding:16px;color:#64748b;">— (Sin episodios de emergencia registrados)</td></tr>`;
   } else {
     episodios.forEach((ep, i) => {
       const sv = ep.signos_vitales || {};
@@ -2178,102 +2255,172 @@ function imprimirFichaHistoriaClinica(pacienteEncoded) {
           <td style="font-weight:700;">#${episodios.length - i}<br><code style="font-size:10px;">${ep.folio || ""}</code></td>
           <td>${ep.fecha || "—"}<br><span style="font-size:10px;color:#64748b;">${ep.hora || ""}</span></td>
           <td style="font-weight:800;color:#0284c7;">${ep.prioridad || "—"}</td>
-          <td>${ep.motivo_consulta || "Triaje de Emergencia"}</td>
+          <td>${ep.motivo_consulta || "—"}</td>
           <td style="font-size:11px;">${vitalsStr}</td>
-          <td>${ep.cama_asignada || "Observación"}</td>
+          <td>${ep.cama_asignada || ep.destino_clinico || "—"}</td>
           <td style="font-weight:800;">${pagoStr}<br><span style="font-size:10px;color:#16a34a;">${ep.tipo_seguro || seguro}</span></td>
         </tr>
       `;
     });
   }
-  const printHtml = `
-    <html><head><title>Expediente de Historia Clínica — ${hc}</title><style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; padding: 30px; max-width: 900px; margin: auto; color: #0f172a; line-height: 1.45; font-size: 12px; }
-      .header-hc { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #0284c7; padding-bottom: 12px; margin-bottom: 16px; }
-      .inst-info h2 { margin: 0; font-size: 1.2rem; color: #0f172a; font-weight: 900; }
-      .inst-info p { margin: 2px 0 0; font-size: 0.78rem; color: #64748b; font-weight: 600; }
-      .hc-badge { border: 2px solid #0284c7; background: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-size: 1.1rem; font-weight: 900; text-align: center; font-family: monospace; }
-      .section-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 14px; }
-      .section-title { font-size: 0.82rem; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
-      .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-      .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
-      .field label { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 2px; }
-      .field span { font-size: 0.88rem; font-weight: 700; color: #0f172a; }
-      .alergia-alert { background: ${esAlergico ? "#fee2e2" : "#f0fdf4"}; border: 2px solid ${esAlergico ? "#ef4444" : "#86efac"}; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 11px; }
-      th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+
+  const modsAudit = Array.isArray(master.modificaciones_auditoria) ? master.modificaciones_auditoria : [];
+  const filasModsHtml = modsAudit.length > 0
+    ? modsAudit.map(m => `
+        <tr>
+          <td><strong>${m.auditor}</strong></td>
+          <td style="font-family:monospace;">${m.ip}</td>
+          <td>${m.fecha} ${m.hora}</td>
+          <td><strong>${m.campo}</strong></td>
+          <td>${m.valor_anterior || "—"} → <strong>${m.valor}</strong></td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">Sin modificaciones de auditoría registradas.</td></tr>`;
+
+  // Firmas electrónicas simuladas (Médico que corresponde siempre; si hubo modificación, al costado firma del Auditor)
+  const nombreMedFirma = (medTrat && medTrat !== "—") ? medTrat : "Médico Tratante / Guardia Emergencia";
+  const hashMed = Math.abs((hc + nombreMedFirma).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
+  const bloqueFirmaMedico = `
+    <div id="firma_electronica_medico_hc" style="width:270px; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; background:#f8fafc; text-align:center;">
+      <svg width="180" height="42" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 14 38 C 24 8, 40 44, 54 14 C 66 2, 80 36, 94 12 C 106 2, 118 30, 132 10 C 144 4, 160 26, 174 8 M 28 42 C 75 45, 125 40, 182 32" stroke="#0f2b5c" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <div style="border-top:1.5px solid #0f2b5c; padding-top:5px; font-size:0.78rem; font-weight:800; color:#0f172a;">${nombreMedFirma}</div>
+      <div style="font-size:0.68rem; color:#475569;">Médico Responsable · Colegio Médico del Perú</div>
+      <div style="font-size:0.64rem; color:#0369a1; font-family:monospace; margin-top:3px;">FIRMA ELECTRÓNICA SIMULADA · PKI-${hashMed}</div>
+    </div>
+  `;
+
+  let bloqueFirmaAuditor = "";
+  if (modsAudit.length > 0) {
+    const ultMod = modsAudit[0];
+    const hashAud = Math.abs((hc + ultMod.auditor + ultMod.fecha + ultMod.hora).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
+    bloqueFirmaAuditor = `
+      <div id="firma_electronica_auditor_hc" style="width:270px; border:1.5px solid #fcd34d; border-radius:8px; padding:10px 12px; background:#fffbeb; text-align:center;">
+        <svg width="180" height="42" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 18 34 C 36 6, 48 40, 68 16 C 84 6, 96 36, 118 12 C 134 4, 150 28, 172 14 M 22 40 C 70 38, 130 42, 176 36" stroke="#b45309" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <div style="border-top:1.5px solid #b45309; padding-top:5px; font-size:0.78rem; font-weight:800; color:#78350f;">${ultMod.auditor}</div>
+        <div style="font-size:0.68rem; color:#92400e;">Auditor Médico / Verificador · IP: ${ultMod.ip}</div>
+        <div style="font-size:0.64rem; color:#b45309; font-family:monospace; margin-top:3px;">FIRMA ELECTRÓNICA AUDITOR · ${ultMod.fecha} ${ultMod.hora} · PKI-${hashAud}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <html><head><title>Historia Clínica Integral — ${hc}</title><style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; padding: 24px; max-width: 960px; margin: auto; color: #0f172a; line-height: 1.42; font-size: 11.5px; }
+      .header-hc { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #0284c7; padding-bottom: 10px; margin-bottom: 14px; }
+      .inst-info h2 { margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 900; }
+      .inst-info p { margin: 2px 0 0; font-size: 0.76rem; color: #64748b; font-weight: 600; }
+      .hc-badge { border: 2px solid #0284c7; background: #e0f2fe; color: #0369a1; padding: 6px 14px; border-radius: 8px; font-size: 1.05rem; font-weight: 900; text-align: center; font-family: monospace; }
+      .section-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+      .section-title { font-size: 0.78rem; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; }
+      .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .field label { font-size: 0.68rem; color: #64748b; font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 1px; }
+      .field span { font-size: 0.82rem; font-weight: 700; color: #0f172a; }
+      .alergia-alert { background: ${esAlergico ? "#fee2e2" : "#f0fdf4"}; border: 2px solid ${esAlergico ? "#ef4444" : "#86efac"}; border-radius: 8px; padding: 9px 12px; margin-bottom: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 10.5px; }
+      th, td { border: 1px solid #cbd5e1; padding: 5px 7px; text-align: left; vertical-align: top; }
       th { background: #f8fafc; font-weight: 800; color: #334155; }
-      .firma-box { margin-top: 40px; display: flex; justify-content: space-around; text-align: center; }
-      .firma-line { border-top: 1px solid #0f172a; width: 220px; padding-top: 6px; font-size: 0.75rem; font-weight: 700; }
+      .firma-box { margin-top: 28px; display: flex; justify-content: center; gap: 36px; flex-wrap: wrap; }
     </style></head>
     <body>
       <div class="header-hc">
         <div class="inst-info">
           <h2>UNIVERSIDAD POLITÉCNICA DEL PERÚ — FCS</h2>
           <p>Departamento de Emergencia y Cuidados Críticos · Hospital Docente UPP</p>
-          <p style="color:#0284c7;font-weight:700;">EXPEDIENTE DE HISTORIA CLÍNICA INTEGRAL (CON HISTORIAL EPISÓDICO)</p>
+          <p style="color:#0284c7;font-weight:700;">HISTORIA CLÍNICA INTEGRAL (NTS N° 139-MINSA / HL7 FHIR / ISO 13606)</p>
         </div>
         <div>
           <div class="hc-badge">${hc}</div>
-          <div style="font-size:0.72rem;text-align:center;color:#64748b;margin-top:3px;">FOLIO HIS OFICIAL</div>
+          <div style="font-size:0.7rem;text-align:center;color:#64748b;margin-top:3px;">FECHA IMPRESIÓN: ${new Date().toLocaleString("es-PE")}</div>
         </div>
       </div>
       <div class="section-box">
-        <div class="section-title">I. Filiación y Datos de Identificación</div>
+        <div class="section-title">I. Filiación Completa y Datos Administrativos</div>
         <div class="grid-4">
-          <div class="field"><label>Apellidos y Nombres</label><span>${nom}</span></div>
-          <div class="field"><label>Documento de Identidad</label><span>DNI ${ident}</span></div>
-          <div class="field"><label>Edad / Sexo</label><span>${master.edad ? `${master.edad} años` : "—"} (${master.sexo || "M"})</span></div>
-          <div class="field"><label>Régimen de Aseguramiento</label><span>${seguro}</span></div>
+          <div class="field"><label>Apellidos y Nombres</label><span>${master.nombre_completo || nom}</span></div>
+          <div class="field"><label>DNI / Identificador</label><span>${master.identificador || ident}</span></div>
+          <div class="field"><label>Edad / Sexo</label><span>${master.edad ? `${master.edad} años` : "—"} (${master.sexo || "—"})</span></div>
+          <div class="field"><label>Seguro / IAFAS</label><span>${seguro}</span></div>
+          <div class="field"><label>Fecha de Nacimiento</label><span>${fechaNac}</span></div>
+          <div class="field"><label>Teléfono</label><span>${telefono}</span></div>
+          <div class="field"><label>Dirección</label><span>${direccion}</span></div>
+          <div class="field"><label>Contacto Emergencia</label><span>${contactoEmerg}</span></div>
+          <div class="field"><label>Forma de Llegada</label><span>${formaLlegada}</span></div>
+          ${camposPersonalizadosHtml}
         </div>
       </div>
       <div class="alergia-alert">
-        <div style="font-size:0.8rem;font-weight:900;color:${esAlergico ? "#991b1b" : "#166534"};text-transform:uppercase;">
-          ${esAlergico ? "⚠️ ALERGIAS MEDICAMENTOSAS REGISTRADAS (ALERTA MÉDICA PERMANENTE)" : "✓ ALERGIAS MEDICAMENTOSAS REGISTRADAS"}
+        <div style="font-size:0.78rem;font-weight:900;color:${esAlergico ? "#991b1b" : "#166534"};text-transform:uppercase;">
+          II. Alergias y Antecedentes Clínicos
         </div>
-        <div style="font-size:1rem;font-weight:900;color:${esAlergico ? "#7f1d1d" : "#14532d"};margin-top:3px;">
-          ${alergias}
+        <div style="font-size:0.9rem;font-weight:900;color:${esAlergico ? "#7f1d1d" : "#14532d"};margin-top:2px;">Alergias: ${alergias}</div>
+        <div class="grid-2" style="margin-top:4px;font-size:0.76rem;">
+          <div><strong>Ant. Personales:</strong> ${antPersonales}</div>
+          <div><strong>Ant. Familiares:</strong> ${antFamiliares}</div>
+          <div><strong>Medicación Habitual:</strong> ${medHabitual}</div>
         </div>
       </div>
       <div class="section-box">
-        <div class="section-title">II. Registro Histórico y Cronológico de Atenciones de Emergencia (${episodios.length} episodio${episodios.length === 1 ? "" : "s"})</div>
+        <div class="section-title">III. Equipo Asistencial Interviniente</div>
+        <div class="grid-4">
+          <div class="field"><label>Enfermera(o) de Triaje</label><span>${enfTriaje}</span></div>
+          <div class="field"><label>Enfermera(o) Asistencial</label><span>${enfAsist}</span></div>
+          <div class="field"><label>Médico Tratante</label><span>${medTrat}</span></div>
+          <div class="field"><label>Personal de Admisión</label><span>${admisionista}</span></div>
+        </div>
+      </div>
+      <div class="section-box">
+        <div class="section-title">IV. Análisis de Laboratorio, Imágenes, Kardex y Notas de Enfermería</div>
+        <div class="grid-2">
+          <div class="field"><label>Resultados de Laboratorio</label><span>${labConsolidado}</span></div>
+          <div class="field"><label>Imágenes / Apoyo Diagnóstico</label><span>${imgConsolidado}</span></div>
+          <div class="field"><label>Kardex Terapéutico</label><span>${kardexConsolidado}</span></div>
+          <div class="field"><label>Notas de Enfermería</label><span>${notasEnfConsolidado}</span></div>
+        </div>
+      </div>
+      <div class="section-box">
+        <div class="section-title">V. Consultas Externas y Controles Ambulatorios (${consultasExt.length})</div>
         <table>
-          <thead>
-            <tr>
-              <th style="width:75px;">Episodio</th>
-              <th style="width:85px;">Fecha / Hora</th>
-              <th style="width:90px;">Prioridad</th>
-              <th>Motivo de Consulta</th>
-              <th>Signos Vitales</th>
-              <th>Cama / Destino</th>
-              <th style="width:95px;">Liquidación</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filasHtml}
-          </tbody>
+          <thead><tr><th>#</th><th>Fecha / Hora</th><th>Especialidad</th><th>Médico</th><th>Detalle / CIE-10</th></tr></thead>
+          <tbody>${filasConsultasExt}</tbody>
         </table>
       </div>
       <div class="section-box">
-        <div class="section-title">III. Marco Legal y Derechos Asistenciales</div>
-        <p style="font-size:0.74rem;color:#475569;margin:0;">
-          Atención brindada en estricto cumplimiento de la <strong>Ley N° 27604</strong> (Atención de Emergencia sin condicionamiento previo) y Ley N° 26842 (Ley General de Salud). La confidencialidad y preservación del histórico clínico se rige bajo la Ley N° 29733 de Protección de Datos Personales.
-        </p>
+        <div class="section-title">VI. Registro Histórico de Ingresos y Atenciones de Emergencia (${episodios.length})</div>
+        <table>
+          <thead><tr><th>Episodio</th><th>Fecha / Hora</th><th>Prioridad</th><th>Motivo</th><th>Signos Vitales</th><th>Cama / Destino</th><th>Liquidación</th></tr></thead>
+          <tbody>${filasHtml}</tbody>
+        </table>
+      </div>
+      <div class="section-box">
+        <div class="section-title">VII. Bitácora de Modificaciones Auditadas (${modsAudit.length})</div>
+        <table>
+          <thead><tr><th>Auditor</th><th>IP PC</th><th>Día / Hora</th><th>Campo</th><th>Cambio Realizado</th></tr></thead>
+          <tbody>${filasModsHtml}</tbody>
+        </table>
       </div>
       <div class="firma-box">
-        <div>
-          <div class="firma-line">Lic. Enfermería de Turno / Triaje<br>Colegio de Enfermeros del Perú</div>
-        </div>
-        <div>
-          <div class="firma-line">Médico Emergentólogo / Asistencial<br>Colegio Médico del Perú</div>
-        </div>
+        ${bloqueFirmaMedico}
+        ${bloqueFirmaAuditor}
       </div>
     </body></html>
   `;
+}
+window.construirHTMLImpresionHistoriaClinica = construirHTMLImpresionHistoriaClinica;
+
+function imprimirFichaHistoriaClinica(pacienteEncoded) {
+  const printHtml = construirHTMLImpresionHistoriaClinica(pacienteEncoded);
+  if (!printHtml) return;
   const w = window.open("", "_blank");
+  if (!w) { alert("Permita las ventanas emergentes para imprimir la Historia Clínica."); return; }
   w.document.write(printHtml);
   w.document.close();
-  w.print();
+  w.focus();
+  setTimeout(() => { w.print(); }, 200);
 }
 function clasificarYBuscarEnBD(identificador) {
   const limpio = String(identificador || "").trim().replace(/\s+/g, " ");
@@ -16262,6 +16409,27 @@ function actualizarCondicionConsentimiento(cond) {
       badgeLegal.style.background = "#e0f2fe";
       badgeLegal.style.color = "#0369a1";
       badgeLegal.style.borderColor = "#bae6fd";
+    }
+  }
+
+  // Bloquear o desbloquear la sección de acciones del consentimiento si es consulta/tratamiento no invasivo
+  const bloquearConsent = (cond === "no_requerido_clinico");
+  const boxAcciones = document.getElementById("consentimiento_acciones_box");
+  const btnVerCons = document.getElementById("btn_ver_consentimiento_legal");
+  const btnImpCons = document.getElementById("btn_imprimir_consentimiento_firma");
+  const chkCons = document.getElementById("chk_consentimiento_firmado");
+  if (boxAcciones) {
+    boxAcciones.style.opacity = bloquearConsent ? "0.45" : "1";
+    boxAcciones.style.pointerEvents = bloquearConsent ? "none" : "auto";
+    boxAcciones.title = bloquearConsent ? "Bloqueado: No requiere consentimiento escrito en consulta o tratamiento no invasivo." : "";
+  }
+  if (btnVerCons) btnVerCons.disabled = bloquearConsent;
+  if (btnImpCons) btnImpCons.disabled = bloquearConsent;
+  if (chkCons) {
+    chkCons.disabled = bloquearConsent;
+    if (bloquearConsent) {
+      chkCons.checked = false;
+      STATE.consentimientoAdjuntoHC = false;
     }
   }
 
