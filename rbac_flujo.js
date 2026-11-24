@@ -272,13 +272,13 @@
     if (cola.length > 0) {
       let pxPendiente = null;
       if (rol === "MEDICO") {
-        pxPendiente = cola.find(p => p.estadoFlujo === "EN_ATENCION_MEDICA");
+        pxPendiente = cola.find(p => !esPacienteFinalizado(p) && p.estadoFlujo === "EN_ATENCION_MEDICA");
       } else if (rol === "ADMISION") {
-        pxPendiente = cola.find(p => !p.coberturaValidada && p.estadoFlujo !== "CERRADO_FACTURADO");
+        pxPendiente = cola.find(p => !esPacienteFinalizado(p) && !p.coberturaValidada);
       } else if (rol === "CAJA") {
-        pxPendiente = cola.find(p => p.estadoFlujo === "PENDIENTE_CAJA");
+        pxPendiente = cola.find(p => !esPacienteFinalizado(p) && p.estadoFlujo === "PENDIENTE_CAJA");
       } else if (rol === "TRIAJE") {
-        pxPendiente = cola.find(p => p.estadoFlujo === "PENDIENTE_TRIAJE");
+        pxPendiente = cola.find(p => !esPacienteFinalizado(p) && (p.estadoFlujo === "PENDIENTE_TRIAJE" || !p.estadoFlujo));
       }
 
       // Auto-seleccionar si el rol no tiene paciente activo o el actual no corresponde a su bandeja
@@ -644,11 +644,13 @@
     }
   }
 
+  window.inyectarBandejaPostaClinica = inyectarBandejaPostaClinica;
   function inyectarBandejaPostaClinica() {
     if (document.getElementById("bandeja_posta_container")) return;
 
+    const workspaceCenter = document.getElementById("cockpit_workspace_center");
     const cardsWrapper = document.getElementById("activePatientsCardsList");
-    const parent = cardsWrapper ? cardsWrapper.parentElement : document.querySelector("main");
+    const parent = workspaceCenter || (cardsWrapper ? cardsWrapper.parentElement : document.querySelector("main"));
     if (!parent) return;
 
     const bandejaHtml = `
@@ -739,6 +741,19 @@
   // ----------------------------------------------------------------------------
   let filtroBandejaActual = "TODOS";
 
+  function esPacienteFinalizado(p) {
+    if (!p) return false;
+    return Boolean(
+      p.estadoFlujo === "CERRADO_FACTURADO" ||
+      p.estadoFlujo === "ALTA_CLINICA" ||
+      p.terminoFlujo === true ||
+      p.estadoAtencion === "Atendido" ||
+      p.estadoAtencion === "Alta de Emergencia" ||
+      p.estadoAtencion === "Cerrado"
+    );
+  }
+  window.esPacienteFinalizado = esPacienteFinalizado;
+
   window.renderizarBandejaPosta = function() { return renderizarBandejaPosta(); };
   function renderizarBandejaPosta() {
     const cola = window.PACIENTES_COLA || [];
@@ -753,15 +768,19 @@
     let hayP1Urgente = false;
 
     cola.forEach(p => {
+      const yaTermino = esPacienteFinalizado(p);
+      if (yaTermino) {
+        cCerrados++;
+        return; // Los pacientes que terminaron el flujo NO deben figurar en contadores de módulos operativos
+      }
       const ef = p.estadoFlujo || "PENDIENTE_TRIAJE";
       if (p.prioridad === "I" || p.alertaPrioridad1 || p.ingresoDirectoCritico) {
         hayP1Urgente = true;
       }
       if (ef === "PENDIENTE_TRIAJE") cTriaje++;
-      if (!p.coberturaValidada && ef !== "CERRADO_FACTURADO") cAdmision++;
+      if (!p.coberturaValidada) cAdmision++;
       if (ef === "EN_ATENCION_MEDICA") cMedico++;
       if (ef === "PENDIENTE_CAJA") cCaja++;
-      if (ef === "CERRADO_FACTURADO") cCerrados++;
     });
 
     const elTodos = document.getElementById("count_posta_todos");
@@ -809,10 +828,12 @@
     let candidato = null;
     if (estado === "TODOS") {
       candidato = cola[0];
+    } else if (estado === "CERRADO_FACTURADO") {
+      candidato = cola.find(p => esPacienteFinalizado(p));
     } else if (estado === "ADMISION") {
-      candidato = cola.find(p => !p.coberturaValidada && p.estadoFlujo !== "CERRADO_FACTURADO");
+      candidato = cola.find(p => !esPacienteFinalizado(p) && !p.coberturaValidada);
     } else {
-      candidato = cola.find(p => p.estadoFlujo === estado);
+      candidato = cola.find(p => !esPacienteFinalizado(p) && (p.estadoFlujo === estado || (estado === "PENDIENTE_TRIAJE" && !p.estadoFlujo)));
     }
 
     if (candidato && candidato.id !== window.pacienteActivoId) {
@@ -1623,6 +1644,40 @@
     } else {
       window.pacienteActivoId = id;
     }
+    const rol = (window.RBAC_FLUJO && typeof window.RBAC_FLUJO.obtenerRolActivo === 'function') 
+      ? window.RBAC_FLUJO.obtenerRolActivo() 
+      : (typeof obtenerRolActivo === 'function' ? obtenerRolActivo() : 'AUDITOR');
+    const modo = obtenerModoOperacion();
+
+    // Aplicar permisos y enmascaramiento según rol activo
+    aplicarPermisosYEnmascaramiento(rol, modo);
+
+    // Navegar a la estación de trabajo según el rol del usuario
+    if (rol === "TRIAJE" && typeof window.irAModulo === "function") {
+      window.irAModulo(1);
+    } else if (rol === "ADMISION" && typeof window.irAModulo === "function") {
+      window.irAModulo(2);
+    } else if (rol === "MEDICO" && typeof window.irAModulo === "function") {
+      window.irAModulo(5);
+    } else if (rol === "CAJA" && typeof window.irAModulo === "function") {
+      window.irAModulo(8);
+    } else if (rol === "AUDITOR") {
+      const cola = window.PACIENTES_COLA || [];
+      const px = cola.find(x => x.id === id);
+      const ef = px ? (px.estadoFlujo || "PENDIENTE_TRIAJE") : "PENDIENTE_TRIAJE";
+      let tFase = 1; let tMod = 1;
+      if (ef === "PENDIENTE_TRIAJE") { tFase = 1; tMod = 1; }
+      else if (ef === "ADMISION" || ef === "TRIAJE_COMPLETO" || ef === "PENDIENTE_ADMISION") { tFase = 2; tMod = 3; }
+      else if (ef === "EN_ATENCION_MEDICA" || ef === "ATENCIÓN_MÉDICA") { tFase = 3; tMod = 4; }
+      else if (ef === "PENDIENTE_CAJA" || ef === "ALTA_CLINICA" || ef === "CERRADO_FACTURADO") { tFase = 4; tMod = 8; }
+
+      if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
+        window.COCKPIT.irAFase(tFase);
+      } else if (typeof window.irAModulo === "function") {
+        window.irAModulo(tMod);
+      }
+    }
+
     actualizarBarraAccionPosta();
     renderizarTrackBoardLista();
     if (window.COCKPIT && typeof window.COCKPIT.actualizarContextoCockpit === "function") {
@@ -1652,14 +1707,27 @@
     });
 
     const rol = (window.RBAC_FLUJO && typeof window.RBAC_FLUJO.obtenerRolActivo === 'function') ? window.RBAC_FLUJO.obtenerRolActivo() : (typeof obtenerRolActivo === 'function' ? obtenerRolActivo() : 'AUDITOR');
-    let primerCandidatoMedico = ordenada.find(p => p.estadoFlujo === "EN_ATENCION_MEDICA");
+    let primerCandidatoMedico = ordenada.find(p => !esPacienteFinalizado(p) && p.estadoFlujo === "EN_ATENCION_MEDICA");
 
     let html = "";
     ordenada.forEach((p, idx) => {
-      // Filtrar según tab activa
+      const yaTermino = esPacienteFinalizado(p);
+
+      // Filtrar según tab activa: CADA PESTAÑA MUESTRA ÚNICAMENTE LOS PACIENTES QUE CORRESPONDEN AL FLUJO CONSULTADO
       if (filtroBandejaActual !== "TODOS") {
-        if (filtroBandejaActual === "ADMISION" && (p.coberturaValidada || p.estadoFlujo === "CERRADO_FACTURADO")) return;
-        if (filtroBandejaActual !== "ADMISION" && p.estadoFlujo !== filtroBandejaActual) return;
+        if (filtroBandejaActual === "CERRADO_FACTURADO") {
+          if (!yaTermino) return;
+        } else {
+          // En pestañas de módulos operativos (Triaje, Admisión, Médico, Caja), NUNCA deben aparecer los que ya terminaron el flujo
+          if (yaTermino) return;
+          if (filtroBandejaActual === "ADMISION") {
+            if (p.coberturaValidada) return;
+          } else if (filtroBandejaActual === "PENDIENTE_TRIAJE") {
+            if (p.estadoFlujo && p.estadoFlujo !== "PENDIENTE_TRIAJE") return;
+          } else {
+            if (p.estadoFlujo !== filtroBandejaActual) return;
+          }
+        }
       }
 
       const turno = p.turno || `E-${String(idx + 1).padStart(3, "0")}`;
@@ -1668,45 +1736,54 @@
       const esSiguienteMed = (rol === "MEDICO" && p === primerCandidatoMedico);
 
       const colorPrio = p.prioridad === "I" ? "#dc2626" : p.prioridad === "II" ? "#ea580c" : p.prioridad === "III" ? "#ca8a04" : p.prioridad === "IV" ? "#16a34a" : "#2563eb";
-      const esAtendido = p.estadoFlujo === "CERRADO_FACTURADO";
+      const esAtendido = yaTermino;
       const bgCard = esAtendido ? (esActivo ? "#ecfdf5" : "#f0fdf4") : (esActivo ? "#eff6ff" : "#ffffff");
       const borderCard = esAtendido ? (esActivo ? "2px solid #16a34a" : "1.5px solid #86efac") : (esActivo ? "2px solid #3b82f6" : esSiguienteMed ? "2px solid #f59e0b" : "1px solid #e2e8f0");
       const shadowCard = esAtendido ? "box-shadow: 0 2px 8px rgba(22, 101, 52, 0.08);" : "";
-      const clickAction = esAtendido 
-        ? `seleccionarExpediente('${p.id}'); if(typeof abrirHistorialFlujoPaciente==='function') abrirHistorialFlujoPaciente('${p.id}');` 
-        : `seleccionarExpediente('${p.id}')`;
 
       html += `
-        <div onclick="${clickAction}" style="display:flex; justify-content:space-between; align-items:center; background:${bgCard}; border:${borderCard}; border-radius:8px; padding:7px 10px; cursor:pointer; transition:all 0.15s ease; ${shadowCard}">
+        <div onclick="seleccionarExpediente('${p.id}')" style="display:flex; justify-content:space-between; align-items:center; background:${bgCard}; border:${borderCard}; border-radius:8px; padding:7px 10px; cursor:pointer; transition:all 0.15s ease; ${shadowCard}" title="Click para seleccionar y atender este paciente en su rol activo">
           <div style="display:flex; align-items:center; gap:8px;">
-            <span style="background:${colorPrio}; color:#ffffff; font-size:0.7rem; font-weight:900; padding:2px 6px; border-radius:4px; font-variant-numeric:tabular-nums;">
-              ${p.prioridad ? "P-" + p.prioridad : "P-V"}
-            </span>
+            <div style="display:flex; flex-direction:column; gap:2px; align-items:center;">
+              <span style="background:${colorPrio}; color:#ffffff; font-size:0.7rem; font-weight:900; padding:2px 6px; border-radius:4px; font-variant-numeric:tabular-nums; white-space:nowrap;">
+                ${p.prioridad ? "CTAS " + (p.prioridad === 'I' ? '1 · P-I' : p.prioridad === 'II' ? '2 · P-II' : p.prioridad === 'III' ? '3 · P-III' : p.prioridad === 'IV' ? '4 · P-IV' : '5 · P-V') : "P-V"}
+              </span>
+              <span style="font-size:0.62rem; font-weight:800; color:${colorPrio}; background:#f8fafc; border:1px solid ${colorPrio}40; padding:1px 4px; border-radius:3px; white-space:nowrap;">
+                ${p.prioridad === 'I' ? 'Reeval: Continua' : p.prioridad === 'II' ? 'Reeval: c/15m' : p.prioridad === 'III' ? 'Reeval: c/30m' : p.prioridad === 'IV' ? 'Reeval: c/60m' : 'Reeval: c/120m'}
+              </span>
+            </div>
             <div>
               <div style="font-size:0.8rem; font-weight:800; color:#0f172a; line-height:1.2;">
                 ${turno} · ${p.nombre || "Paciente"}
                 ${esSiguienteMed ? `<span style="font-size:0.68rem; background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:4px; margin-left:4px;">👉 Siguiente</span>` : ""}
               </div>
               <div style="font-size:0.7rem; color:#64748b; margin-top:2px;">
-                ${p.camaNombre ? `🛏️ ${p.camaNombre}` : "🛏️ Sin cama"} · ${p.estadoAtencion || "En atención"}
+                ${p.camaNombre ? `🛏️ ${p.camaNombre}` : "🛏️ Sin cama"} · ${esAtendido ? "Atendido" : (p.estadoAtencion || "En atención")}
               </div>
             </div>
           </div>
-          <div style="text-align:right;">
+          <div style="text-align:right; display:flex; align-items:center; gap:6px;">
             ${esAtendido ? `
-              <span onclick="event.stopPropagation(); seleccionarExpediente('${p.id}'); if(typeof abrirHistorialFlujoPaciente==='function') abrirHistorialFlujoPaciente('${p.id}');" style="font-size:0.68rem; font-weight:800; color:#15803d; background:#dcfce7; padding:2px 8px; border-radius:4px; border:1px solid #86efac; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Ver historial asistencial por rol con horas">
+              <button type="button" onclick="event.stopPropagation(); seleccionarExpediente('${p.id}'); abrirHistorialFlujoPaciente('${p.id}');" style="font-size:0.68rem; font-weight:800; color:#15803d; background:#dcfce7; padding:3px 8px; border-radius:5px; border:1px solid #86efac; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Ver historial asistencial completo y trazabilidad con fecha y hora">
                 ✓ Atendido 📜
-              </span>
+              </button>
             ` : `
               <span style="font-size:0.68rem; font-weight:700; color:#475569; background:#f1f5f9; padding:2px 6px; border-radius:4px;">
                 ${(p.estadoFlujo || "PENDIENTE_TRIAJE").replace("_", " ")}
               </span>
+              <button type="button" onclick="event.stopPropagation(); abrirHistorialFlujoPaciente('${p.id}');" style="font-size:0.68rem; font-weight:800; color:#0369a1; background:#e0f2fe; padding:3px 8px; border-radius:5px; border:1px solid #7dd3fc; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Consultar datos ingresados hasta el momento y trazabilidad con día y hora">
+                📜 Trazabilidad
+              </button>
             `}
           </div>
         </div>
       `;
     });
 
+    if (!html) {
+      contenedor.innerHTML = `<div style="font-size:0.75rem; color:#94a3b8; text-align:center; padding:12px;">Sin pacientes en este módulo</div>`;
+      return;
+    }
     contenedor.innerHTML = html;
   }
 
@@ -1714,7 +1791,7 @@
 
 
   // ----------------------------------------------------------------------------
-  // 8. MODAL DE HISTORIAL ASISTENCIAL CON CONTROL DE ROLES (RBAC)
+  // 8. MODAL DE HISTORIAL ASISTENCIAL CON CONTROL DE ROLES (RBAC) Y TRAZABILIDAD
   // ----------------------------------------------------------------------------
   window.cerrarModalHistorialFlujo = function() {
     const modal = document.getElementById("modal_historial_flujo_px");
@@ -1738,6 +1815,18 @@
         }
       } catch(e){}
     }
+    if (!px && window.STATE && (window.STATE.identificador === idExpediente || window.STATE.historiaClinica === idExpediente)) {
+      px = {
+        id: idExpediente,
+        nombre: window.STATE.nombreReniec || window.STATE.identificador || "Paciente",
+        dni: window.STATE.numDni || "NN",
+        identificador: window.STATE.identificador,
+        historiaClinica: window.STATE.historiaClinica,
+        prioridad: window.STATE.prioridad,
+        estadoFlujo: window.STATE.estadoFlujo || "PENDIENTE_TRIAJE",
+        timestamp: Date.now()
+      };
+    }
     if (!px) {
       alert("No se encontró el registro del paciente.");
       return;
@@ -1747,6 +1836,10 @@
       ? window.RBAC_FLUJO.obtenerRolActivo() 
       : (typeof obtenerRolActivo === 'function' ? obtenerRolActivo() : 'AUDITOR');
     const esAuditor = rolActivo === "AUDITOR" || rolActivo === "ADMIN";
+    const esMedico = rolActivo === "MEDICO";
+    const esTriaje = rolActivo === "TRIAJE";
+    const esAdmision = rolActivo === "ADMISION";
+    const esCaja = rolActivo === "CAJA";
 
     let modal = document.getElementById("modal_historial_flujo_px");
     if (!modal) {
@@ -1759,91 +1852,122 @@
       document.body.appendChild(modal);
     }
 
-    const state = window.STATE || {};
-    const f = px.firmas || state.firmas || {};
+    // Snapshot dinámico de datos ingresados hasta el momento
+    const st = (window.STATE && (px.id === window.pacienteActivoId || px.identificador === window.STATE.identificador || (window.STATE.numDni && px.dni === window.STATE.numDni))) 
+      ? window.STATE 
+      : (px.stateSnapshot || {});
+    const f = px.firmas || st.firmas || {};
 
-    function formatearFechaHora(fechaStr) {
-      if (!fechaStr) return "Hora no registrada";
+    // Formateador garantizado de Trazabilidad: Día (DD/MM/AAAA) y Hora (HH:mm:ss)
+    function formatearFechaHoraTrazabilidad(fechaInput, fallbackDate) {
+      const target = fechaInput || fallbackDate;
+      if (!target) return null;
       try {
-        const d = new Date(fechaStr);
-        return d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + 
-               " · " + d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const d = (target instanceof Date) ? target : new Date(target);
+        if (isNaN(d.getTime())) return null;
+        const dia = d.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const hora = d.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `📅 ${dia} 🕒 ${hora}`;
       } catch(e) {
-        return fechaStr;
+        return null;
       }
     }
 
-    // FASE 1: TRIAJE
-    let triajeContentHtml = "";
-    if (esAuditor || rolActivo === "TRIAJE") {
-      const horaTriaje = f.triaje ? formatearFechaHora(f.triaje.fecha) : (px.timestamp ? formatearFechaHora(px.timestamp) : "Registrado en ingreso");
-      const respTriaje = f.triaje ? `${f.triaje.usuario} (${f.triaje.colegiatura || "CEP"})` : "Lic. Ana Torres (CEP 92410)";
-      const spo2 = px.spo2 || (px.stateSnapshot && px.stateSnapshot.spo2) || state.spo2 || 98;
-      const fc = px.fc || (px.stateSnapshot && px.stateSnapshot.fc) || state.fc || 78;
-      const pas = px.pasSistolica || (px.stateSnapshot && px.stateSnapshot.pasSistolica) || state.pasSistolica || 120;
-      const pad = px.paDiastolica || (px.stateSnapshot && px.stateSnapshot.paDiastolica) || state.paDiastolica || 80;
-      const fr = px.fr || (px.stateSnapshot && px.stateSnapshot.fr) || state.fr || 18;
-      const temp = px.temperatura || (px.stateSnapshot && px.stateSnapshot.temperatura) || state.temperatura || 36.8;
-      const eva = px.eva !== undefined ? px.eva : ((px.stateSnapshot && px.stateSnapshot.eva) || state.eva || 3);
-      const prio = px.prioridad || state.prioridad || "III";
-      const alergias = px.alergias || (px.stateSnapshot && px.stateSnapshot.alergias) || state.alergias || "Niega alergias medicamentosas conocidas";
-      const cama = px.camaNombre || (px.stateSnapshot && px.stateSnapshot.camaAsignada) || state.camaAsignada || "Tópico de Emergencia";
+    const fechaLlegadaTxt = formatearFechaHoraTrazabilidad(px.timestampLlegada || px.timestamp) || formatearFechaHoraTrazabilidad(new Date());
 
+    // FASE 1: TRIAJE FISIOLÓGICO & FILIACIÓN
+    let triajeContentHtml = "";
+    const horaTriajeExacta = formatearFechaHoraTrazabilidad(f.triaje ? f.triaje.fecha : (px.fechaHoraTriaje || px.timestampLlegada || px.timestamp));
+    const respTriaje = f.triaje ? `${f.triaje.usuario} (${f.triaje.colegiatura || "CEP"})` : "Lic. Ana Torres (CEP 92410)";
+    const spo2 = st.spo2 || px.spo2 || (document.getElementById("spo2_full")?.value) || 98;
+    const fc = st.fc || px.fc || (document.getElementById("fc_full")?.value) || 78;
+    const pas = st.pasSistolica || px.pasSistolica || (document.getElementById("pas_full")?.value) || 120;
+    const pad = st.paDiastolica || px.paDiastolica || (document.getElementById("pad_full")?.value) || 80;
+    const fr = st.fr || px.fr || (document.getElementById("fr_full")?.value) || 18;
+    const temp = st.temperatura || px.temperatura || (document.getElementById("temp_full")?.value) || 36.8;
+    const eva = st.eva !== undefined ? st.eva : (px.eva !== undefined ? px.eva : ((document.getElementById("eva_full")?.value) || 0));
+    const glasgow = st.glasgow || px.glasgow || (document.getElementById("glasgow_full")?.value) || 15;
+    const glucosa = st.glucosa || px.glucosa || (document.getElementById("glucosa_full")?.value) || "—";
+    const prio = px.prioridad || st.prioridad || "III";
+    const alergias = st.alergias || px.alergias || (document.getElementById("alergias_full")?.value) || "Niega alergias medicamentosas conocidas";
+    const camaInicial = px.camaNombre || st.camaAsignada || "Tópico de Emergencia";
+    const motivoConsulta = st.motivoConsulta || px.motivo || (document.getElementById("motivo_full")?.value) || "Evaluación clínica de emergencia";
+
+    if (esAuditor || esTriaje || esMedico) {
       triajeContentHtml = `
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
             <div style="font-weight:800; color:#0f172a; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
               <span>👩‍⚕️ Paso 1: Triaje Fisiológico & Filiación</span>
-              <span style="background:#16a34a; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">✓ Sello Inmutable</span>
+              <span style="background:${f.triaje ? '#16a34a' : '#0284c7'}; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">
+                ${f.triaje ? '✓ Sello Oficial Inmutable' : '🟡 Datos Ingresados hasta el Momento'}
+              </span>
             </div>
             <div style="font-size:0.75rem; font-family:'JetBrains Mono', monospace; color:#0284c7; font-weight:700;">
-              🕒 ${horaTriaje}
+              ${horaTriajeExacta || "📅 Día y Hora en registro"}
             </div>
           </div>
           <div style="font-size:0.78rem; color:#334155; line-height:1.5;">
-            <div><strong>Responsable:</strong> ${respTriaje}</div>
-            <div><strong>Prioridad Clínica:</strong> Prioridad ${prio} · <strong>Recurso Inicial:</strong> 🛏️ ${cama}</div>
+            <div><strong>Responsable de Triaje:</strong> ${respTriaje}</div>
+            <div><strong>Prioridad Asignada:</strong> <span style="font-weight:900; color:#dc2626;">Prioridad ${prio}</span> · <strong>Recurso Recomendado:</strong> 🛏️ ${camaInicial}</div>
+            <div><strong>Motivo de Consulta:</strong> ${motivoConsulta}</div>
             <div style="background:#f1f5f9; padding:6px 10px; border-radius:6px; margin:6px 0; font-family:'JetBrains Mono', monospace; font-size:0.74rem;">
-              SpO2: <strong>${spo2}%</strong> · FC: <strong>${fc} lpm</strong> · PA: <strong>${pas}/${pad} mmHg</strong> · FR: <strong>${fr} rpm</strong> · T°: <strong>${temp} °C</strong> · EVA: <strong>${eva}/10</strong>
+              SpO2: <strong>${spo2}%</strong> · FC: <strong>${fc} lpm</strong> · PA: <strong>${pas}/${pad} mmHg</strong> · FR: <strong>${fr} rpm</strong> · T°: <strong>${temp} °C</strong> · Glasgow: <strong>${glasgow}/15</strong> · EVA: <strong>${eva}/10</strong> · Glucosa: <strong>${glucosa} mg/dL</strong>
             </div>
-            <div><strong>Alergias registradas:</strong> <span style="color:#b91c1c; font-weight:700;">${alergias}</span></div>
-            <div style="color:#64748b; font-size:0.72rem; margin-top:4px;">Norma Técnica de Salud N° 139-MINSA · Expediente sellado y derivado a atención médica.</div>
+            <div><strong>Alergias Registradas:</strong> <span style="color:#b91c1c; font-weight:800;">${alergias}</span></div>
+            <div style="color:#64748b; font-size:0.72rem; margin-top:4px;">Trazabilidad NTS N° 139-MINSA / CTAS Canadiense · Sello fisiológico inmutable.</div>
           </div>
         </div>
       `;
     } else {
+      // Visión para Admisión o Caja
       triajeContentHtml = `
-        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; margin-bottom:12px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; gap:8px;">
-          <span>🔒</span>
-          <span><strong>Paso 1: Triaje:</strong> Registro asistencial reservado para Enfermería o Auditoría Médica (NTS N° 139-MINSA).</span>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="font-weight:800; color:#0f172a; font-size:0.83rem;">
+              👩‍⚕️ Paso 1: Triaje (Resumen Asistencial)
+            </div>
+            <div style="font-size:0.74rem; font-family:'JetBrains Mono', monospace; color:#0284c7; font-weight:700;">
+              ${horaTriajeExacta || "Fecha/Hora registrada"}
+            </div>
+          </div>
+          <div style="font-size:0.77rem; color:#475569;">
+            <div><strong>Prioridad:</strong> Prioridad ${prio} · <strong>Ingreso:</strong> ${px.modalidad || 'A pie'} · <strong>Destino:</strong> ${camaInicial}</div>
+            <div style="color:#64748b; font-size:0.72rem; margin-top:2px;">🔒 Constantes vitales protegidas bajo Ley N° 29733 (Acceso exclusivo a Médico/Enfermería/Auditoría).</div>
+          </div>
         </div>
       `;
     }
 
-    // FASE 2: ADMISIÓN
+    // FASE 2: ADMISIÓN & COBERTURA DE SEGUROS
     let admisionContentHtml = "";
-    if (esAuditor || rolActivo === "ADMISION") {
-      const horaAdmision = f.admision ? formatearFechaHora(f.admision.fecha) : (px.coberturaValidada ? "Validación automática paralela" : "En verificación");
-      const respAdmision = f.admision ? f.admision.usuario : "Srta. Sofía Quispe (ADM-042)";
-      const tipoSeguro = px.tipoSeguro || (px.stateSnapshot && px.stateSnapshot.tipoSeguro) || state.tipoSeguro || (px.esNN ? "Garantía Ley N° 27604 (NN)" : "MINSA (SIS — FUA)");
-      const docSeguro = px.nroFua || px.nroEssi || (px.stateSnapshot && (px.stateSnapshot.nroFua || px.stateSnapshot.nroEssi)) || state.nroFua || state.nroEssi || "FUA-2026-90412";
+    const coberturaValidada = Boolean(px.coberturaValidada || st.coberturaValidada || f.admision);
+    const horaAdmisionExacta = formatearFechaHoraTrazabilidad(f.admision ? f.admision.fecha : (px.fechaHoraAdmision || (coberturaValidada ? px.timestamp : null)));
+    const respAdmision = f.admision ? f.admision.usuario : "Srta. Sofía Quispe (ADM-042)";
+    const tipoSeguro = st.tipoSeguro || px.tipoSeguro || (px.esNN ? "Garantía Ley N° 27604 (NN)" : "MINSA (SIS — FUA)");
+    const docSeguro = st.nroFua || st.nroEssi || px.nroFua || px.nroEssi || (coberturaValidada ? ("FUA-2026-" + (px.dni || "042")) : "Pendiente de emisión");
 
+    if (esAuditor || esAdmision || esMedico || esCaja) {
       admisionContentHtml = `
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
             <div style="font-weight:800; color:#0f172a; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
               <span>📋 Paso 2: Admisión & Cobertura de Seguros</span>
-              <span style="background:#0284c7; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">✓ Acreditado</span>
+              <span style="background:${coberturaValidada ? '#0284c7' : '#f59e0b'}; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">
+                ${coberturaValidada ? '✓ Cobertura Acreditada' : '⏳ En Verificación Paralela'}
+              </span>
             </div>
             <div style="font-size:0.75rem; font-family:'JetBrains Mono', monospace; color:#0284c7; font-weight:700;">
-              🕒 ${horaAdmision}
+              ${horaAdmisionExacta || ("En proceso desde: " + fechaLlegadaTxt)}
             </div>
           </div>
           <div style="font-size:0.78rem; color:#334155; line-height:1.5;">
             <div><strong>Operador de Admisión:</strong> ${respAdmision}</div>
             <div><strong>Régimen de Financiamiento:</strong> <strong style="color:#0369a1;">${tipoSeguro}</strong></div>
-            <div><strong>Comprobante / N° Trámite:</strong> <span style="font-family:'JetBrains Mono', monospace;">${docSeguro}</span></div>
-            <div style="color:#15803d; font-weight:700; margin-top:4px;">✅ Cobertura validada en línea contra Padrón SUSALUD sin interrumpir atención clínica.</div>
+            <div><strong>Comprobante / N° Trámite Oficial:</strong> <span style="font-family:'JetBrains Mono', monospace;">${docSeguro}</span></div>
+            <div style="color:${coberturaValidada ? '#15803d' : '#b45309'}; font-weight:700; margin-top:4px;">
+              ${coberturaValidada ? '✅ Cobertura validada en línea contra Padrón SUSALUD sin interrumpir atención clínica.' : '⏳ Cobertura en proceso de verificación por personal de Admisión (Ley N° 27604).'}
+            </div>
           </div>
         </div>
       `;
@@ -1851,103 +1975,181 @@
       admisionContentHtml = `
         <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; margin-bottom:12px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; gap:8px;">
           <span>🔒</span>
-          <span><strong>Paso 2: Admisión:</strong> Registro de acreditación reservado para Personal de Admisión o Auditoría Médica.</span>
+          <span><strong>Paso 2: Admisión:</strong> Registro de acreditación reservado para Admisión o Auditoría Médica. Cobertura: ${tipoSeguro}.</span>
         </div>
       `;
     }
 
-    // FASE 3: MÉDICO
+    // FASE 3: ATENCIÓN MÉDICA & DIAGNÓSTICO
     let medicoContentHtml = "";
-    if (esAuditor || rolActivo === "MEDICO") {
-      const horaMed = f.medico ? formatearFechaHora(f.medico.fecha) : (px.estadoFlujo === "EN_ATENCION_MEDICA" ? "Atención en curso" : "Pendiente de alta");
-      const respMed = f.medico ? `${f.medico.usuario} (${f.medico.colegiatura || "CMP"})` : "Dr. Carlos Vega (CMP 58321)";
-      const cie10 = px.diagnosticoCie10 || (px.stateSnapshot && px.stateSnapshot.diagnosticoCie10) || state.diagnosticoCie10 || "K35.8 — Apendicitis aguda no especificada";
-      const camaLib = px.camaNombre || (px.stateSnapshot && px.stateSnapshot.camaAsignada) || state.camaAsignada || "Tópico de Emergencia (ST-01)";
+    const yaEvaluadoMedico = Boolean(f.medico || px.estadoFlujo === "PENDIENTE_CAJA" || px.estadoFlujo === "CERRADO_FACTURADO" || px.estadoFlujo === "ALTA_CLINICA" || esPacienteFinalizado(px));
+    const enAtencionMedica = Boolean(!yaEvaluadoMedico && px.estadoFlujo === "EN_ATENCION_MEDICA");
+    const horaMedExacta = formatearFechaHoraTrazabilidad(f.medico ? f.medico.fecha : (px.fechaHoraMedico || px.horaSustentoMedico));
+    const respMed = f.medico ? `${f.medico.usuario} (${f.medico.colegiatura || "CMP"})` : (st.medicoTratante && st.medicoTratante !== "Por asignar" ? st.medicoTratante : (enAtencionMedica || yaEvaluadoMedico ? "Dr. Carlos Vega (CMP 58321)" : "Médico por asignar"));
+    const cie10 = st.cie10Descripcion ? `${st.cie10Codigo || 'CIE-10'} — ${st.cie10Descripcion}` : (px.diagnosticoCie10 || (yaEvaluadoMedico ? "K35.8 — Apendicitis aguda no especificada" : (enAtencionMedica ? "Evaluación clínica y plan terapéutico en curso" : "Pendiente de evaluación médica")));
+    const camaActual = px.camaNombre || st.camaAsignada || (yaEvaluadoMedico ? "Recurso liberado (Alta Ambulatoria)" : (enAtencionMedica ? "Tópico de Emergencia (ST-01)" : "Por asignar"));
 
+    if (esAuditor || esMedico) {
       medicoContentHtml = `
         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
             <div style="font-weight:800; color:#0f172a; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
               <span>🩺 Paso 3: Atención Médica & Diagnóstico</span>
-              <span style="background:#7c3aed; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">✓ Alta Médica</span>
+              <span style="background:${yaEvaluadoMedico ? '#7c3aed' : (enAtencionMedica ? '#2563eb' : '#94a3b8')}; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">
+                ${yaEvaluadoMedico ? '✓ Alta Médica Sellada' : (enAtencionMedica ? '🟡 En Atención Médica Activa' : '⏳ Pendiente')}
+              </span>
             </div>
             <div style="font-size:0.75rem; font-family:'JetBrains Mono', monospace; color:#0284c7; font-weight:700;">
-              🕒 ${horaMed}
+              ${horaMedExacta || (enAtencionMedica ? "Iniciada en guardia" : "Pendiente de llamado")}
             </div>
           </div>
           <div style="font-size:0.78rem; color:#334155; line-height:1.5;">
             <div><strong>Médico Tratante:</strong> ${respMed}</div>
-            <div><strong>Diagnóstico Principal:</strong> <strong style="color:#6d28d9;">${cie10}</strong></div>
-            <div><strong>Recurso Hospitalario Utilizado:</strong> 🛏️ ${camaLib}</div>
-            <div style="color:#15803d; font-weight:700; margin-top:4px;">✅ Alta médica confirmada · Cama liberada y disponible en el censo operativo hospitalario.</div>
+            <div><strong>Diagnóstico Clínico (CIE-10):</strong> <strong style="color:#6d28d9;">${cie10}</strong></div>
+            <div><strong>Recurso Hospitalario:</strong> 🛏️ ${camaActual}</div>
+            <div style="color:${yaEvaluadoMedico ? '#15803d' : '#2563eb'}; font-weight:700; margin-top:4px;">
+              ${yaEvaluadoMedico ? '✅ Alta médica formal confirmada · Recurso de cama liberado en censo operativo.' : (enAtencionMedica ? '🩺 Paciente en tópico bajo evaluación clínica y monitoreo de constantes.' : '⏳ Esperando disponibilidad y llamado a tópico médico.')}
+            </div>
           </div>
         </div>
       `;
     } else {
       medicoContentHtml = `
-        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; margin-bottom:12px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; gap:8px;">
-          <span>🔒</span>
-          <span><strong>Paso 3: Médico:</strong> Registro clínico reservado para el Médico Tratante o Auditoría Médica (Secreto Médico / Ley N° 26842).</span>
+        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; margin-bottom:12px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>🔒</span>
+            <span><strong>Paso 3: Médico:</strong> ${yaEvaluadoMedico ? 'Alta Médica Sellada' : (enAtencionMedica ? 'Atención Médica en Curso' : 'Pendiente de Atención')} · Médico: ${respMed}</span>
+          </div>
+          <span style="font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:#0369a1; font-weight:700;">${horaMedExacta || ""}</span>
         </div>
       `;
     }
 
     // FASE 4: CAJA & LIQUIDACIÓN
     let cajaContentHtml = "";
-    if (esAuditor || rolActivo === "CAJA") {
-      const horaCaja = f.caja ? formatearFechaHora(f.caja.fecha) : (px.estadoFlujo === "CERRADO_FACTURADO" ? "Liquidación oficial emitida" : "Pendiente de facturación");
-      const respCaja = f.caja ? f.caja.usuario : "Sr. Luis Paredes (FACT-882)";
-      const totalLiq = px.totalLiquidado || (px.stateSnapshot && px.stateSnapshot.montoTotal) || state.montoTotal || 85.00;
-      const copago = px.copagoPaciente !== undefined ? px.copagoPaciente : ((px.stateSnapshot && px.stateSnapshot.copagoPaciente) || state.copagoPaciente || 0.00);
+    const yaLiquidado = Boolean(f.caja || px.estadoFlujo === "CERRADO_FACTURADO" || esPacienteFinalizado(px));
+    const enCaja = Boolean(!yaLiquidado && px.estadoFlujo === "PENDIENTE_CAJA");
+    const horaCajaExacta = formatearFechaHoraTrazabilidad(f.caja ? f.caja.fecha : (px.fechaHoraCaja || (yaLiquidado ? px.timestamp : null)));
+    const respCaja = f.caja ? f.caja.usuario : "Sr. Luis Paredes (FACT-882)";
+    const totalLiq = st.montoTotal || px.totalLiquidado || (st.items_factura && st.items_factura.length ? st.items_factura.reduce((a,b)=>a+(b.monto||0),0) : 85.00);
+    const copago = px.copagoPaciente !== undefined ? px.copagoPaciente : ((st.copagoPaciente !== undefined) ? st.copagoPaciente : 0.00);
 
+    if (esAuditor || esCaja) {
       cajaContentHtml = `
-        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:6px;">
             <div style="font-weight:800; color:#0f172a; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
               <span>💳 Paso 4: Liquidación, Cierre & Auditoría</span>
-              <span style="background:#15803d; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">✓ Atendido y Cerrado</span>
+              <span style="background:${yaLiquidado ? '#15803d' : (enCaja ? '#86198f' : '#94a3b8')}; color:#fff; font-size:0.68rem; padding:1px 6px; border-radius:4px;">
+                ${yaLiquidado ? '✓ Atendido y Cerrado' : (enCaja ? '🟡 En Ventanilla Caja' : '⏳ Pendiente')}
+              </span>
             </div>
             <div style="font-size:0.75rem; font-family:'JetBrains Mono', monospace; color:#0284c7; font-weight:700;">
-              🕒 ${horaCaja}
+              ${horaCajaExacta || (enCaja ? "Expediente en ventanilla" : "Pendiente de alta previa")}
             </div>
           </div>
           <div style="font-size:0.78rem; color:#334155; line-height:1.5;">
             <div><strong>Cajero / Liquidador:</strong> ${respCaja}</div>
             <div style="display:flex; gap:16px; margin:6px 0; background:#f1f5f9; padding:8px 12px; border-radius:6px; font-family:'JetBrains Mono', monospace;">
-              <div>Total Liquidado: <strong>S/ ${Number(totalLiq).toFixed(2)}</strong></div>
-              <div>Copago Paciente: <strong style="color:${copago > 0 ? '#b91c1c' : '#15803d'};">S/ ${Number(copago).toFixed(2)}</strong></div>
+              <div>Total Facturado: <strong>S/ ${Number(totalLiq).toFixed(2)}</strong></div>
+              <div>Copago Paciente: <strong style="color:${Number(copago) > 0 ? '#b91c1c' : '#15803d'};">S/ ${Number(copago).toFixed(2)}</strong></div>
             </div>
-            <div style="color:#15803d; font-weight:700; margin-top:4px;">✅ Cierre formal completado bajo amparo de la Ley N° 29414 (Egreso garantizado sin retención).</div>
+            <div style="color:${yaLiquidado ? '#15803d' : '#86198f'}; font-weight:700; margin-top:4px;">
+              ${yaLiquidado ? '✅ Cierre formal completado bajo amparo de la Ley N° 29414 (Egreso garantizado sin retención).' : (enCaja ? '🟡 Expediente derivado a Caja para emisión de liquidación y comprobante oficial.' : '⏳ Pendiente de emisión de liquidación en caja.')}
+            </div>
           </div>
         </div>
       `;
     } else {
       cajaContentHtml = `
-        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; gap:8px;">
-          <span>🔒</span>
-          <span><strong>Paso 4: Caja:</strong> Registro de facturación y liquidación reservado para Personal de Caja o Auditoría Médica.</span>
+        <div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px; margin-bottom:12px; color:#64748b; font-size:0.76rem; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span>🔒</span>
+            <span><strong>Paso 4: Caja:</strong> ${yaLiquidado ? 'Liquidación Oficial Cerrada (Ley N° 29414)' : (enCaja ? 'En Trámite de Caja' : 'Pendiente')}</span>
+          </div>
+          <span style="font-family:'JetBrains Mono', monospace; font-size:0.72rem; color:#0369a1; font-weight:700;">${horaCajaExacta || ""}</span>
+        </div>
+      `;
+    }
+
+    // SECCIÓN ESPECIAL PARA EL AUDITOR: BITÁCORA INTEGRAL DE AUDITORÍA
+    let auditorLogHtml = "";
+    if (esAuditor) {
+      let logsItems = [];
+      try {
+        const rawLogs = localStorage.getItem("AUDIT_LOGS_HISTORIAL");
+        if (rawLogs) {
+          const allL = JSON.parse(rawLogs);
+          logsItems = allL.filter(l => (px.dni && l.dni === px.dni) || (l.detalle && l.detalle.includes(px.nombre || px.identificador)));
+        }
+      } catch(e){}
+
+      // Si no hay logs directos, armar la bitácora con los hitos cronológicos registrados
+      if (logsItems.length === 0) {
+        logsItems = [
+          { timestamp: fechaLlegadaTxt, modulo: "Módulo 1", evento: "INGRESO_PACIENTE", rol: "Admisión / Triaje", detalle: `Ingreso registrado: ${px.nombre} (${px.modalidad || 'A pie'})` },
+          { timestamp: horaTriajeExacta || fechaLlegadaTxt, modulo: "Módulo 1", evento: "SELLAR_TRIAJE", rol: respTriaje, detalle: `Prioridad asignada: Prioridad ${prio} · Constantes fisiológicas selladas` }
+        ];
+        if (coberturaValidada) {
+          logsItems.push({ timestamp: horaAdmisionExacta || fechaLlegadaTxt, modulo: "Módulo 3", evento: "VALIDAR_COBERTURA", rol: respAdmision, detalle: `Cobertura validada: ${tipoSeguro} (${docSeguro})` });
+        }
+        if (yaEvaluadoMedico || enAtencionMedica) {
+          logsItems.push({ timestamp: horaMedExacta || fechaLlegadaTxt, modulo: "Módulo 5", evento: yaEvaluadoMedico ? "ALTA_MEDICA" : "INICIO_ATENCION", rol: respMed, detalle: `Evaluación médica: ${cie10} · Cama: ${camaActual}` });
+        }
+        if (yaLiquidado || enCaja) {
+          logsItems.push({ timestamp: horaCajaExacta || fechaLlegadaTxt, modulo: "Módulo 8", evento: yaLiquidado ? "CIERRE_LIQUIDACION" : "DERIVADO_CAJA", rol: respCaja, detalle: `Liquidación: Total S/ ${Number(totalLiq).toFixed(2)} · Copago S/ ${Number(copago).toFixed(2)}` });
+        }
+      }
+
+      auditorLogHtml = `
+        <div style="background:#0f172a; color:#f8fafc; border-radius:10px; padding:14px; margin-top:14px; border:1px solid #334155;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid #334155; padding-bottom:6px;">
+            <div style="font-weight:800; font-size:0.83rem; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+              <span>📑 Bitácora Integral de Auditoría & Trazabilidad (SUSALUD / NTS N° 042-MINSA)</span>
+            </div>
+            <span style="font-size:0.68rem; background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:4px; font-family:'JetBrains Mono', monospace;">
+              ${logsItems.length} Eventos Registrados
+            </span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; max-height:160px; overflow-y:auto;">
+            ${logsItems.map(l => `
+              <div style="background:#1e293b; border:1px solid #334155; border-radius:6px; padding:7px 10px; font-size:0.73rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:2px; font-family:'JetBrains Mono', monospace;">
+                  <span style="color:#38bdf8; font-weight:700;">${l.timestamp}</span>
+                  <span style="color:#94a3b8; background:#0f172a; padding:1px 5px; border-radius:3px;">${l.modulo} · ${l.evento}</span>
+                </div>
+                <div style="color:#e2e8f0;">${l.detalle}</div>
+                <div style="color:#64748b; font-size:0.68rem; margin-top:2px;">Operador/Firmante: <strong>${l.rol}</strong></div>
+              </div>
+            `).join("")}
+          </div>
         </div>
       `;
     }
 
     const badgePermisos = esAuditor 
-      ? `<span style="background:#0284c7; color:#ffffff; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:9999px;">🛡️ Vista Auditoría Médica (Acceso Completo 100%)</span>`
-      : `<span style="background:#fef3c7; color:#92400e; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:9999px;">🔒 Vista Estación: ${rolActivo} (Acceso a su Intervención)</span>`;
+      ? `<span style="background:#0284c7; color:#ffffff; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:9999px;">🛡️ Vista Auditoría Médica (Acceso Integral 100% y Trazabilidad Cronológica)</span>`
+      : `<span style="background:#fef3c7; color:#92400e; font-size:0.72rem; font-weight:800; padding:3px 10px; border-radius:9999px;">🔒 Vista Estación: ${rolActivo} (Datos según nivel de intervención · Ley N° 29733)</span>`;
 
     modal.innerHTML = `
-      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; max-width:680px; width:100%; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); overflow:hidden;">
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; max-width:720px; width:100%; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); overflow:hidden;">
         
         <!-- Header -->
-        <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:#ffffff; padding:16px 20px; border-bottom:3px solid #16a34a;">
+        <div style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color:#ffffff; padding:16px 20px; border-bottom:3px solid #0284c7;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-                <h3 style="font-size:1.05rem; font-weight:800; margin:0;">📜 Historial Asistencial & Bitácora de Flujo</h3>
-                <span style="background:#16a34a; color:#ffffff; font-size:0.68rem; font-weight:800; padding:2px 8px; border-radius:4px;">✓ Atendido</span>
+                <h3 style="font-size:1.05rem; font-weight:800; margin:0;">📜 Consulta de Paciente & Trazabilidad de Flujo</h3>
+                <span style="background:${esPacienteFinalizado(px) ? '#16a34a' : '#0284c7'}; color:#ffffff; font-size:0.68rem; font-weight:800; padding:2px 8px; border-radius:4px;">
+                  ${esPacienteFinalizado(px) ? '✓ Atendido' : (px.estadoFlujo || 'EN CURSO').replace('_', ' ')}
+                </span>
               </div>
               <p style="font-size:0.78rem; color:#cbd5e1; margin:0;">
-                ${px.turno || "E-001"} · <strong>${px.nombre || "Paciente"}</strong> · DNI: <strong>${px.dni || "NN"}</strong> · HC: <span style="font-family:'JetBrains Mono', monospace;">${px.historiaClinica || state.historiaClinica || "—"}</span>
+                ${px.turno || "E-001"} · <strong>${px.nombre || "Paciente"}</strong> · DNI: <strong>${px.dni || "NN"}</strong> · HC: <span style="font-family:'JetBrains Mono', monospace;">${px.historiaClinica || st.historiaClinica || "—"}</span>
               </p>
+              <div style="font-size:0.72rem; color:#94a3b8; margin-top:3px;">
+                Hora y Día de Ingreso: <strong style="color:#f8fafc;">${fechaLlegadaTxt}</strong> · Modalidad: ${px.modalidad || 'A pie'}
+              </div>
             </div>
             <button type="button" onclick="window.cerrarModalHistorialFlujo()" style="background:transparent; border:none; color:#cbd5e1; font-size:1.4rem; cursor:pointer; line-height:1;">✕</button>
           </div>
@@ -1957,20 +2159,21 @@
         </div>
 
         <!-- Body -->
-        <div style="padding:18px; overflow-y:auto; max-height:calc(92vh - 140px);">
+        <div style="padding:18px; overflow-y:auto; max-height:calc(92vh - 150px);">
           ${triajeContentHtml}
           ${admisionContentHtml}
           ${medicoContentHtml}
           ${cajaContentHtml}
+          ${auditorLogHtml}
         </div>
 
         <!-- Footer -->
-        <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:12px 20px; display:flex; justify-content:space-between; align-items:center;">
-          <div style="font-size:0.72rem; color:#64748b;">
-            HIS Triaje Emergencia · Trazabilidad NTS N° 042-MINSA / Ley N° 29414
-          </div>
-          <button type="button" onclick="window.cerrarModalHistorialFlujo()" style="background:#0f172a; color:#ffffff; border:none; padding:7px 16px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
-            Cerrar Historial
+        <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button type="button" onclick="seleccionarExpediente('${px.id}'); window.cerrarModalHistorialFlujo();" style="background:#0284c7; color:#ffffff; border:none; padding:8px 16px; border-radius:6px; font-size:0.78rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" title="Cargar y activar este paciente para su atención clínica">
+            👉 Seleccionar para Atención (${rolActivo})
+          </button>
+          <button type="button" onclick="window.cerrarModalHistorialFlujo()" style="background:#0f172a; color:#ffffff; border:none; padding:8px 16px; border-radius:6px; font-size:0.78rem; font-weight:700; cursor:pointer;">
+            Cerrar Consulta
           </button>
         </div>
 

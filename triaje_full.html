@@ -2495,6 +2495,9 @@
           🛏️ Camas &amp; Quirófanos: <span id="lbl_navbar_dispo_resumen">15/15 Libres</span>
         </button>
         <span class="mini-chip" id="mini_prioridad_badge">🚦 Triaje: Por evaluar</span>
+        <button type="button" class="mini-chip" onclick="abrirModalHistorialDiasAnteriores()" style="background:#0f172a; color:#ffffff; border:1px solid #334155; font-weight:700; cursor:pointer;" title="Consultar Registro Diario de Atenciones de Días Anteriores (NTS N° 139-MINSA)">
+          📅 Historial Diario
+        </button>
         <span class="mini-chip" id="mini_soat_badge" style="display:none; background:#fff7ed; color:#c2410c; border-color:#fb923c;">
           🚗 SOAT Saldo: S/. 27,500.00
         </span>
@@ -2654,11 +2657,19 @@
           <button type="button" class="btn-caos-action btn-soat-action" onclick="admitirEmergenciaSoat()" title="Protocolo de Emergencia Accidente de Tránsito / Trauma Vial (Ley N° 27181 & D.S. N° 024-2002-MTC)" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; font-weight: 800; border: 1px solid #075985; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
             🚗 Accidente de Tránsito / Trauma Vial (SOAT)
           </button>
-          <button type="button" class="btn-caos-action btn-start-action" onclick="abrirModalPreTriageSTART()" title="Pre-Triage de Cola en 15 segundos (Método START/Manchester)">
+          <button type="button" class="btn-caos-action btn-start-action" onclick="abrirModalPreTriageSTART()" title="Pre-Triage de Cola en 15 segundos (Método START / CTAS Rápido)">
             ⚡ Pre-Triage de Cola (15s)
           </button>
           <button type="button" class="btn-caos-action btn-newpx-action" onclick="registrarPacienteEnEspera()" title="Registrar llegada de paciente a sala de espera" style="background:#0284c7; color:#ffffff; border:none; font-weight:800;">
             ➕ Registrar Paciente en Espera
+          </button>
+          <!-- BOTÓN DE REINICIO DE SIMULACIÓN Y DEMOSTRACIÓN CON SIGNO [!] -->
+          <button type="button" class="btn-caos-action btn-reset-demo" onclick="confirmarReinicioDemostracion()" title="⚠️ ATENCIÓN: Este botón existe únicamente para la simulación y demostración (Demo / Sandbox). Reinicia el sistema a cero y restablece las 15 camas libres." style="background:linear-gradient(135deg, #b45309 0%, #d97706 100%); color:#ffffff; font-weight:800; border:1.5px solid #92400e; box-shadow:0 2px 6px rgba(180,83,9,0.25);">
+            ⚠️! Reiniciar Todo a Cero [Demo]
+          </button>
+          <!-- BOTÓN PARA CONSULTAR ATENCIONES DE DÍAS ANTERIORES -->
+          <button type="button" class="btn-caos-action btn-historial-dias" onclick="abrirModalHistorialDiasAnteriores()" title="Consultar atenciones de días anteriores según NTS N° 139-MINSA" style="background:#0f172a; color:#ffffff; font-weight:800; border:1.5px solid #334155; box-shadow:0 2px 6px rgba(15,23,42,0.25);">
+            📅 Atenciones Días Anteriores
           </button>
           <!-- DESEMPATE ASIGNADO EXCLUSIVAMENTE AL MODO SIMULACIÓN SANDBOX -->
           <button type="button" class="btn-caos-action btn-desempate-action" onclick="abrirModalLlegadasSimultaneasDesempate()" style="display:none !important;" title="Exclusivo de Simulación Sandbox">
@@ -2914,15 +2925,18 @@
             </label>
             <select id="motivo_cedis_select" class="input-full" onchange="seleccionarMotivoCedis(this.value)">
               <option value="">Seleccione motivo CEDIS...</option>
-              <option value="dolor_toracico">❤️ Dolor torácico / Opresión retroesternal (Isquemia / Angina)</option>
-              <option value="disnea">🫁 Disnea / Dificultad respiratoria aguda</option>
-              <option value="trauma">🩹 Trauma / Accidente agudo no vehicular</option>
-              <option value="accidente_transito">🚗 Accidente de tránsito (SOAT)</option>
-              <option value="fiebre_infeccion">🌡️ Fiebre / Infección sistémica (Sospecha Sepsis)</option>
-              <option value="dolor_abdominal">🤢 Dolor abdominal agudo</option>
-              <option value="alt_neurologica">🧠 Alteración neurológica / Cefalea severa / Déficit focal</option>
+              <option value="dolor_toracico">❤️ Cardiovascular / Dolor torácico (Isquemia / Angina)</option>
+              <option value="disnea">🫁 Respiratorio / Disnea aguda</option>
+              <option value="alt_neurologica">🧠 Neurológico (Cefalea severa / Déficit focal agudo)</option>
+              <option value="trauma">🩹 Trauma / Mecanismo de alto riesgo</option>
+              <option value="dolor_abdominal">🤢 Gastrointestinal / Dolor abdominal agudo</option>
+              <option value="fiebre_infeccion">🌡️ Infeccioso / Fiebre sistémica (Sospecha Sepsis)</option>
               <option value="obstetrico">🤰 Obstétrico / Ginecológico (Gestante / Hemorragia)</option>
-              <option value="consulta_leve">👤 Patología leve / Consulta externa / Trámite</option>
+              <option value="psiquiatrico">🧘 Psiquiátrico / Conductual / Agitación</option>
+              <option value="oftalmo_orl">👁️ Oftalmo / Otorrinolaringológico (ORL)</option>
+              <option value="piel_menor">🩹 Piel / Herida menor / Ambulatorio</option>
+              <option value="accidente_transito">🚗 Accidente de tránsito (SOAT)</option>
+              <option value="consulta_leve">👤 Consulta externa / Trámite ambulatorio</option>
             </select>
           </div>
           <div class="form-field" style="margin-bottom:0;">
@@ -3077,6 +3091,17 @@
 
         <!-- 5. MODIFICADORES DE 2.DO ORDEN COLAPSABLES (CTAS CANADÁ) -->
         <div style="margin: 14px 0 12px;">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <button type="button" class="btn-full-secondary" id="btn_toggle_mod_glucosa" onclick="toggleSeccionMod2do('glucosa')" style="font-weight:700; font-size:0.78rem; padding:6px 12px; border:1.5px solid #cbd5e1; background:#f8fafc; border-radius:8px; cursor:pointer;">
+              🩸 [+ Glucemia / Modificadores Específicos]
+            </button>
+            <button type="button" class="btn-full-secondary" id="btn_toggle_mod_pediatrico" onclick="toggleSeccionMod2do('pediatrico')" style="font-weight:700; font-size:0.78rem; padding:6px 12px; border:1.5px solid #0284c7; background:#f0f9ff; color:#0369a1; border-radius:8px; cursor:pointer;">
+              👶 [+ Pediátrico (&lt; 14 años) — PaedCTAS]
+            </button>
+            <button type="button" class="btn-full-secondary" id="btn_toggle_mod_gestante" onclick="toggleSeccionMod2do('gestante')" style="font-weight:700; font-size:0.78rem; padding:6px 12px; border:1.5px solid #e11d48; background:#fff1f2; color:#be123c; border-radius:8px; cursor:pointer;">
+              🤰 [+ Gestante — Claves Obstétricas MINSA]
+            </button>
+          </div>
           <button type="button" class="btn-full-secondary" id="btn_toggle_mod2do" onclick="toggleModificadores2doOrden()" style="display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:0.8rem; padding:8px 14px; border:1.5px dashed #94a3b8; background:#f8fafc; border-radius:8px; cursor:pointer;">
             <span id="icon_mod2do">➕</span>
             <span>Modificadores específicos de 2.do orden: Glucemia / Pediátrico (TEP) / Gestante / Códigos Tiempo</span>
@@ -5666,7 +5691,7 @@
         <button type="button" onclick="cerrarModalAdmisionNN()" style="background:none; border:none; color:#ffffff; font-size:1.5rem; cursor:pointer;">&times;</button>
       </div>
       <div class="modal-hc-body" style="padding:16px;">
-        <form id="form_admision_nn" onsubmit="ejecutarAdmisionRapidaNN(event)">
+        <form id="form_admision_nn" novalidate onsubmit="ejecutarAdmisionRapidaNN(event)">
           <div style="margin-bottom:12px;">
             <label style="font-weight:700; font-size:0.82rem; display:block; margin-bottom:6px;">Sexo Aparente:</label>
             <div style="display:flex; gap:10px;">
@@ -5716,7 +5741,7 @@
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:1.4rem;">⚡</span>
           <div>
-            <strong style="font-size:1rem;">Pre-Triage de Cola Rápido (Método START/Manchester — 15s)</strong>
+            <strong style="font-size:1rem;">Pre-Triage de Cola Rápido (Método START / CTAS Rápido — 15s)</strong>
             <div style="font-size:0.75rem; opacity:0.9;">Tamizaje veloz para descongestionar la fila en emergencias saturadas</div>
           </div>
         </div>
@@ -5880,6 +5905,50 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ======================================================================
+       MODAL: CONSULTA DE ATENCIONES DE DÍAS ANTERIORES (NTS N° 139-MINSA)
+       ====================================================================== -->
+  <div class="modal-hc-overlay" id="modal_historial_dias_anteriores" style="display:none;" onclick="if(event.target===this)cerrarModalHistorialDiasAnteriores()">
+    <div class="modal-hc-container" style="max-width:1050px; width:95%; max-height:92vh; display:flex; flex-direction:column;">
+      <div style="background:#0f172a; color:#ffffff; display:flex; justify-content:space-between; align-items:center; padding:14px 20px; border-top-left-radius:12px; border-top-right-radius:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:1.4rem;">📅</span>
+          <div>
+            <h3 style="margin:0; font-size:1.05rem; font-weight:800;">Archivo y Registro de Atenciones Diarias — NTS N° 139-MINSA</h3>
+            <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">Consulta de Pacientes Atendidos en Guardias Anteriores · Trazabilidad Inmutable</div>
+          </div>
+        </div>
+        <button type="button" onclick="cerrarModalHistorialDiasAnteriores()" style="background:none; border:none; color:#ffffff; font-size:1.4rem; cursor:pointer;">&times;</button>
+      </div>
+
+      <div style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <label for="sel_fecha_historico_dias" style="font-size:0.82rem; font-weight:800; color:#1e293b;">Seleccionar Guardia / Fecha:</label>
+          <select id="sel_fecha_historico_dias" class="form-input" style="padding:6px 12px; font-size:0.82rem; font-weight:700; border-radius:6px; min-width:240px; border:1.5px solid #0284c7;" onchange="cambiarFechaConsultaHistorico(this.value)">
+            <!-- Opciones inyectadas dinámicamente -->
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="mini-chip" id="badge_resumen_historico_dia" style="background:#eff6ff; color:#0369a1; border:1px solid #bfdbfe; font-weight:800; font-size:0.78rem;">
+            Cargando atenciones...
+          </span>
+        </div>
+      </div>
+
+      <div style="padding:16px 20px; overflow-y:auto; flex:1; background:#ffffff;" id="contenedor_tabla_historico_dias">
+        <!-- Tabla inyectada dinámicamente -->
+      </div>
+
+      <div style="padding:12px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <div style="font-size:0.75rem; color:#64748b;">
+          Norma Técnica de Salud N° 139-MINSA/DGIEM · Cada día operativo inicia desde cero conservando el historial legal.
+        </div>
+        <button type="button" class="btn-full-secondary" onclick="cerrarModalHistorialDiasAnteriores()">Cerrar Consulta</button>
       </div>
     </div>
   </div>

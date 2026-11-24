@@ -578,6 +578,51 @@
         episodio = master[dniParam].ultimo_episodio;
       }
 
+      // Validación de precondición estricta: existencia de paciente o datos
+      const hayPacienteValido = Boolean(
+        dniParam ||
+        (expActual && (expActual.numDni || expActual.nombreReniec || (expActual.identificador && expActual.identificador.length > 2))) ||
+        (episodio && (episodio.identificador || episodio.nombre_completo)) ||
+        localStorage.getItem("UPP_PACIENTE_DNI") ||
+        localStorage.getItem("UPP_PACIENTE_NOMBRE")
+      );
+
+      if (!hayPacienteValido) {
+        document.getElementById("disp_nombre").textContent = "— [SIN PACIENTE ASIGNADO] —";
+        document.getElementById("disp_dni").textContent = "—";
+        document.getElementById("disp_hc").textContent = "—";
+        document.getElementById("disp_folio").textContent = "—";
+        document.getElementById("disp_prioridad").textContent = "—";
+        document.getElementById("disp_regimen").textContent = "SIN COBERTURA / SIN ATENCIÓN";
+        document.getElementById("disp_fecha").textContent = new Date().toLocaleString();
+
+        const tbody = document.getElementById("tabla_cargos_cuerpo");
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:35px; color:#ef4444; font-weight:700;">
+            ⚠️ NO HAY NINGÚN PACIENTE ASIGNADO NI CONSUMOS CLÍNICOS PARA FACTURAR.<br>
+            <span style="font-weight:400; font-size:0.85rem; color:#64748b;">Debe registrar o admitir un paciente en el sistema de triaje antes de emitir liquidación oficial.</span>
+          </td></tr>`;
+        }
+        const tbTot = document.getElementById("liq_subtotal_bruto"); if (tbTot) tbTot.textContent = "S/. 0.00";
+        const cIa = document.getElementById("liq_cobertura_seguro"); if (cIa) cIa.textContent = "- S/. 0.00";
+        const tPag = document.getElementById("liq_total_paciente"); if (tPag) tPag.textContent = "S/. 0.00 (SIN PACIENTE)";
+        const expLeg = document.getElementById("explicacion_legal");
+        if (expLeg) expLeg.textContent = "Atención bloqueada: No se puede liquidar ni emitir comprobante de pago hospitalario sin un paciente asignado con historia clínica y registros asistenciales válidos.";
+        const btnPrint = document.querySelector(".btn-act-success");
+        if (btnPrint) {
+          btnPrint.disabled = true;
+          btnPrint.style.opacity = "0.4";
+          btnPrint.style.cursor = "not-allowed";
+        }
+        const btnJson = document.querySelector(".btn-act-primary");
+        if (btnJson) {
+          btnJson.disabled = true;
+          btnJson.style.opacity = "0.4";
+          btnJson.style.cursor = "not-allowed";
+        }
+        return;
+      }
+
       // Valores iniciales
       let nombreActual = "LUIS GUILLERMO VASQUEZ VALDIVIESO";
       let dniActual = "44418504";

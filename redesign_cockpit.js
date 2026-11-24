@@ -69,8 +69,8 @@
         </div>
       </div>
 
-      <div id="cockpit_posta_wrapper">
-        <!-- Contenedor donde se aloja la bandeja de posta clínica -->
+      <div id="cockpit_active_patients_wrapper" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- Contenedor donde se aloja el Tablero de atención simultánea y cola -->
       </div>
     `;
 
@@ -318,11 +318,21 @@
     if (sec7) phase3.appendChild(sec7);
     if (sec8) phase4.appendChild(sec8);
 
-    // Mover la bandeja de posta al sidebar izquierdo
+    // Mover el Tablero de atención simultánea y cola de emergencias al sidebar izquierdo
+    const activePanel = document.getElementById("activePatientsPanel");
+    const queueWrapper = document.getElementById("cockpit_active_patients_wrapper");
+    if (activePanel && queueWrapper) {
+      queueWrapper.appendChild(activePanel);
+      activePanel.style.display = "block";
+      activePanel.style.width = "100%";
+    }
+
+    // Mover la bandeja de posta al área central de trabajo (debajo de las fases asistenciales) a ancho completo
     const bandejaPosta = document.getElementById("bandeja_posta_container");
-    const postaWrapper = document.getElementById("cockpit_posta_wrapper");
-    if (bandejaPosta && postaWrapper) {
-      postaWrapper.appendChild(bandejaPosta);
+    if (bandejaPosta) {
+      workspaceCenter.appendChild(bandejaPosta);
+      bandejaPosta.style.width = "100%";
+      bandejaPosta.style.display = "block";
     }
 
     // Ocultar main contenedor viejo
@@ -392,6 +402,11 @@
         <span class="cockpit-role-badge" id="cockpit_top_rol_badge">
           🛡️ Rol: AUDITOR
         </span>
+
+        <!-- Botón Expandir/Contraer Todo (Modo Auditor) -->
+        <button type="button" class="cockpit-btn-theme" id="btn_expand_all_modules" onclick="window.COCKPIT.toggleExpandirContraerTodo()" title="Expandir o contraer todas las fases y módulos de una sola vez">
+          ⤢ Expandir Todo
+        </button>
 
         <!-- Botón Modo Oscuro / Claro -->
         <button type="button" class="cockpit-btn-theme" id="btn_toggle_dark_mode" onclick="window.COCKPIT.toggleDarkMode()" title="Cambiar tema">
@@ -778,7 +793,7 @@
 
     // 1. Paciente activo en STATE (si no está dado de alta o liquidado)
     const flujoActivo = st.estadoFlujo || "";
-    const estaAltaActivo = flujoActivo === "ALTA_CLINICA" || flujoActivo === "LIQUIDADO_CERRADO" || flujoActivo === "EGRESADO";
+    const estaAltaActivo = flujoActivo === "ALTA_CLINICA" || flujoActivo === "LIQUIDADO_CERRADO" || flujoActivo === "EGRESADO" || flujoActivo === "CERRADO_FACTURADO" || flujoActivo === "ALTA" || flujoActivo === "Atendido";
     const camaActivoNormalizada = (!estaAltaActivo) ? normalizarIdCamaClinica(st.camaAsignadaId || st.camaAsignada || "") : null;
     if (camaActivoNormalizada && idsHospitalarios.includes(camaActivoNormalizada)) {
       camasOcupadas.add(camaActivoNormalizada);
@@ -788,7 +803,7 @@
     const cola = Array.isArray(window.PACIENTES_COLA) ? window.PACIENTES_COLA : [];
     cola.forEach(px => {
       const pxFlujo = px.estadoFlujo || "";
-      if (pxFlujo !== "ALTA_CLINICA" && pxFlujo !== "LIQUIDADO_CERRADO" && pxFlujo !== "EGRESADO") {
+      if (pxFlujo !== "ALTA_CLINICA" && pxFlujo !== "LIQUIDADO_CERRADO" && pxFlujo !== "EGRESADO" && pxFlujo !== "CERRADO_FACTURADO" && pxFlujo !== "ALTA" && pxFlujo !== "Atendido") {
         const idCama = normalizarIdCamaClinica(px.camaId || px.camaAsignada || px.camaNombre || "");
         if (idCama && idsHospitalarios.includes(idCama)) {
           camasOcupadas.add(idCama);
@@ -801,7 +816,7 @@
       Object.keys(window.expedientesStore).forEach(k => {
         const exp = window.expedientesStore[k];
         const expFlujo = exp.estadoFlujo || "";
-        if (expFlujo !== "ALTA_CLINICA" && expFlujo !== "LIQUIDADO_CERRADO" && expFlujo !== "EGRESADO") {
+        if (expFlujo !== "ALTA_CLINICA" && expFlujo !== "LIQUIDADO_CERRADO" && expFlujo !== "EGRESADO" && expFlujo !== "CERRADO_FACTURADO" && expFlujo !== "ALTA" && expFlujo !== "Atendido") {
           const idCama = normalizarIdCamaClinica(exp.camaId || exp.camaAsignada || exp.camaNombre || "");
           if (idCama && idsHospitalarios.includes(idCama)) {
             camasOcupadas.add(idCama);
@@ -816,7 +831,7 @@
         const r = recursos[id];
         if (r && r.estado === "ocupada") {
           const pacFlujo = r.paciente?.estadoFlujo || "";
-          if (pacFlujo === "ALTA_CLINICA" || pacFlujo === "LIQUIDADO_CERRADO") {
+          if (pacFlujo === "ALTA_CLINICA" || pacFlujo === "LIQUIDADO_CERRADO" || pacFlujo === "CERRADO_FACTURADO" || pacFlujo === "ALTA" || pacFlujo === "Atendido") {
             r.estado = "disponible";
             r.paciente = null;
           } else {
@@ -1230,6 +1245,73 @@ function refrescarValoresMonitor() {
     inicializarCockpit();
   }
 
+
+  // ----------------------------------------------------------------------------
+  // RESILIENCIA ANTI-CONGELAMIENTO (VISIBILITYCHANGE, FOCUS & DEBOUNCE RESIZE)
+  // ----------------------------------------------------------------------------
+  let todosModulosExpandidos = false;
+  function toggleExpandirContraerTodo() {
+    todosModulosExpandidos = !todosModulosExpandidos;
+    const btn = document.getElementById("btn_expand_all_modules");
+    if (btn) btn.textContent = todosModulosExpandidos ? "⤡ Contraer Todo" : "⤢ Expandir Todo";
+
+    for (let i = 1; i <= 8; i++) {
+      const body = document.getElementById("body_mod" + i);
+      const arrow = document.getElementById("arrow_mod" + i);
+      if (body) {
+        body.style.display = todosModulosExpandidos ? "block" : (i === 1 ? "block" : "none");
+        if (todosModulosExpandidos) body.classList.add("open");
+        else if (i !== 1) body.classList.remove("open");
+      }
+      if (arrow) {
+        if (todosModulosExpandidos) arrow.classList.add("open");
+        else if (i !== 1) arrow.classList.remove("open");
+      }
+    }
+    if (todosModulosExpandidos) {
+      document.querySelectorAll(".cockpit-phase-container").forEach(p => { p.style.display = "block"; });
+    } else {
+      irAFase(faseActiva);
+    }
+  }
+
+  function resincronizarSilenciosamenteAlReactivar() {
+    if (document.hidden) return;
+    try {
+      if (typeof window.recargarColaCompartidaDesdeStorage === "function") {
+        window.recargarColaCompartidaDesdeStorage();
+      }
+      if (typeof window.renderizarTrackBoardLista === "function") {
+        window.renderizarTrackBoardLista();
+      }
+      if (typeof window.renderizarTableroColaPacientes === "function") {
+        window.renderizarTableroColaPacientes();
+      }
+      if (typeof actualizarContextoCockpit === "function") {
+        actualizarContextoCockpit();
+      }
+      if (typeof actualizarCamasMonitorEnTiempoReal === "function") {
+        actualizarCamasMonitorEnTiempoReal();
+      }
+    } catch(e) {
+      console.warn("Silent resync upon reactivation:", e);
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) resincronizarSilenciosamenteAlReactivar();
+  });
+  window.addEventListener("focus", resincronizarSilenciosamenteAlReactivar);
+
+  let resizeDebounceTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeDebounceTimer);
+    resizeDebounceTimer = setTimeout(() => {
+      document.querySelectorAll(".modal-backdrop-orphan").forEach(el => el.remove());
+      if (typeof actualizarCamasMonitorEnTiempoReal === "function") actualizarCamasMonitorEnTiempoReal();
+    }, 150);
+  });
+
   window.COCKPIT = {
     irAFase,
     ejecutarAccionPrincipal,
@@ -1238,7 +1320,9 @@ function refrescarValoresMonitor() {
     aplicarVistaYPermisosRol,
     actualizarContextoCockpit,
     refrescarValoresMonitor,
-    toggleDarkMode
+    toggleDarkMode,
+    toggleExpandirContraerTodo,
+    resincronizarSilenciosamenteAlReactivar
   };
 
 })();
