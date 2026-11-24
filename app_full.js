@@ -957,6 +957,11 @@ function seleccionarPacienteDeBusqueda(pacienteEncoded) {
 // MODAL DE CATÁLOGO COMPLETO DE HISTORIAS CLÍNICAS
 // ---------------------------------------------------------------------------
 async function abrirModalConsultaHC() {
+  const rolPerm = (typeof rolActivoActual !== "undefined" && rolActivoActual) ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN");
+  if (rolPerm !== "ADMIN" && rolPerm !== "MEDICO") {
+    alert("🔒 Acceso restringido (Ley N° 29733 / NTS N° 139-MINSA): La búsqueda del catálogo de Historias Clínicas solo está habilitada para el Rol de Auditor y Médico.");
+    return;
+  }
   const modal = document.getElementById("modal_consulta_hc");
   if (!modal) return;
   modal.classList.add("open");
@@ -16713,6 +16718,24 @@ window.imprimirConsentimientoDirecto = imprimirConsentimientoDirecto;
 
 // --- GESTIÓN DE ROLES ASISTENCIALES Y PROTECCIÓN DE DATOS (LEY N° 29733) ---
 let rolActivoActual = "ADMIN";
+function actualizarVisibilidadBotonHC(rol) {
+  const rolActual = rol || rolActivoActual || document.getElementById("selector_rol_sistema")?.value || "ADMIN";
+  const permitido = (rolActual === "ADMIN" || rolActual === "MEDICO");
+  const btnHeader = document.getElementById("btn_header_historia_clinica");
+  if (btnHeader) {
+    btnHeader.style.setProperty("display", permitido ? "inline-flex" : "none", "important");
+  }
+  const btnMod2 = document.getElementById("btn_mod2_catalogo_hc");
+  if (btnMod2) {
+    btnMod2.style.setProperty("display", permitido ? "inline-flex" : "none", "important");
+  }
+}
+window.actualizarVisibilidadBotonHC = actualizarVisibilidadBotonHC;
+document.addEventListener("DOMContentLoaded", () => {
+  const selRol = document.getElementById("selector_rol_sistema");
+  actualizarVisibilidadBotonHC(selRol ? selRol.value : rolActivoActual);
+});
+
 function cambiarRolSistema(rol) {
   rolActivoActual = rol || "ADMIN";
   const lbl = document.getElementById("lbl_toggle_vista_caja");
@@ -16750,6 +16773,9 @@ function cambiarRolSistema(rol) {
       elMotivo.disabled = false;
     }
   }
+
+  // Control de visibilidad del botón de búsqueda de Historia Clínica (Solo Auditor [ADMIN] y Médico [MEDICO])
+  actualizarVisibilidadBotonHC(rolActivoActual);
 
   registrarLogAuditoria("Sistema", "CAMBIO_ROL", `Rol activo modificado a: ${rolActivoActual}`);
   if (typeof mostrarToastCola === "function") {
