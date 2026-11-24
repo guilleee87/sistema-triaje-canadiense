@@ -2711,7 +2711,7 @@
         </div>
         <span class="toggle-arrow" id="arrow_mod1">▼</span>
       </div>
-      <div class="module-section-body open" id="body_mod1" style="display: block;">
+      <div class="module-section-body" id="body_mod1" style="display: none;">
 
         
                 <!-- REGISTRO DEL LICENCIADO(A) EN ENFERMERÍA DE TRIAJE (CEP) - NTS N° 042-MINSA -->
@@ -3277,7 +3277,8 @@
 
         <!-- DESPLIEGUE VISUAL DE LA PRIORIDAD EVALUADA -->
         <div id="prioridad_display" class="prioridad-display">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+          <div id="prio_display_content">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
             <div>
               <span style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px; opacity:0.9;">RESULTADO OFICIAL DE TRIAJE FISIOLÓGICO</span>
               <div style="font-size:1.8rem; font-weight:900; line-height:1.2; margin-top:2px;" id="prio_tipo">
@@ -3298,6 +3299,17 @@
           </div>
           <!-- TRAZABILIDAD CLÍNICA AUDITABLE ESTÁNDAR (NTS N° 042 / ESI v5 / NEWS2 / ADA) -->
           <div id="prio_trazabilidad_estandar" style="display:none; margin-top:12px; padding:10px 14px; background:rgba(0,0,0,0.28); border-radius:8px; font-size:0.82rem; line-height:1.45; border:1px solid rgba(255,255,255,0.2);">
+          </div>
+          </div>
+          <!-- CONTENEDOR DEDICADO DE ERROR BIOLÓGICO (SIN DESTRUIR EL TEMPLATE PRINCIPAL) -->
+          <div id="prio_display_error" style="display:none; color:#7f1d1d; text-align:left;">
+            <div style="color:#991b1b; font-weight:800; font-size:15px; margin-bottom:6px;">
+              ⛔ EVALUACIÓN BLOQUEADA: DIGITACIÓN BIOLÓGICAMENTE IMPOSIBLE
+            </div>
+            <div style="font-size:12.5px;">
+              Corrija los campos señalados en rojo para habilitar el algoritmo de Triaje:
+              <ul id="prio_error_lista" style="margin:4px 0 0 16px; font-weight:600;"></ul>
+            </div>
           </div>
         </div>
 

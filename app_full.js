@@ -2269,10 +2269,20 @@ function toggleModule(id) {
     body.classList.remove("open");
     body.style.display = "none";
     if (arrow) arrow.classList.remove("open");
+    if (!isNaN(num) && num >= 1 && num <= 8) {
+      const btnTop = document.getElementById(`btnStepTop_${num}`);
+      if (btnTop) btnTop.classList.remove("active");
+    }
   } else {
     body.classList.add("open");
     body.style.display = "block";
     if (arrow) arrow.classList.add("open");
+    if (!isNaN(num) && num >= 1 && num <= 8) {
+      for (let i = 1; i <= 8; i++) {
+        const btnTop = document.getElementById(`btnStepTop_${i}`);
+        if (btnTop) btnTop.classList.toggle("active", i === num);
+      }
+    }
   }
 }
 
@@ -2285,9 +2295,65 @@ function cerrarTodosLosModulos() {
       b.style.display = "none";
     }
     if (a) a.classList.remove("open");
+    const btnTop = document.getElementById(`btnStepTop_${i}`);
+    if (btnTop) btnTop.classList.remove("active");
   }
 }
 window.cerrarTodosLosModulos = cerrarTodosLosModulos;
+
+function resetearModificadoresYSubsecciones() {
+  const boxMod2do = document.getElementById("box_modificadores_segundo_orden");
+  if (boxMod2do) boxMod2do.style.display = "none";
+  const iconMod2do = document.getElementById("icon_mod2do");
+  if (iconMod2do) iconMod2do.textContent = "➕";
+
+  const elGluc = document.getElementById("glucosa_full");
+  if (elGluc) {
+    elGluc.value = "";
+    elGluc.classList.remove("is-invalid", "input-critical-alert");
+  }
+  const tipGluc = document.getElementById("tooltip_glucosa");
+  if (tipGluc) tipGluc.classList.remove("visible");
+
+  const chkPed = document.getElementById("check_pediatrico");
+  if (chkPed) chkPed.checked = false;
+  const boxPed = document.getElementById("box_pediatrico_detalles") || document.getElementById("campos_pediatrico");
+  if (boxPed) boxPed.style.display = "none";
+  ["apariencia", "respiracion", "circulacion"].forEach(lado => {
+    const chkTep = document.getElementById(`chk_tep_${lado}`);
+    if (chkTep) chkTep.checked = false;
+    const cardTep = document.getElementById(`card_tep_${lado}`);
+    if (cardTep) cardTep.classList.remove("checked");
+  });
+  const selGrupoPed = document.getElementById("sel_grupo_pediatrico");
+  if (selGrupoPed) selGrupoPed.value = "escolar";
+
+  const chkGest = document.getElementById("check_gestante");
+  if (chkGest) chkGest.checked = false;
+  const boxGest = document.getElementById("box_gestante") || document.getElementById("campos_gestante");
+  if (boxGest) boxGest.style.display = "none";
+  const semGest = document.getElementById("sem_gestacion");
+  if (semGest) semGest.value = "";
+  const lcfGest = document.getElementById("lcf_gestacion");
+  if (lcfGest) lcfGest.value = "";
+  const claveObs = document.getElementById("clave_obstetrica_sel");
+  if (claveObs) claveObs.value = "ninguna";
+
+  ["infarto", "ictus", "sepsis"].forEach(cod => {
+    const chk = document.getElementById(`check_cod_${cod}`);
+    if (chk) chk.checked = false;
+    const card = document.getElementById(`card_cod_${cod}`);
+    if (card) card.classList.remove("checked");
+  });
+
+  const btnGluc = document.getElementById("btn_toggle_mod_glucosa");
+  if (btnGluc) btnGluc.classList.remove("active");
+  const btnPed = document.getElementById("btn_toggle_mod_pediatrico");
+  if (btnPed) btnPed.classList.remove("active");
+  const btnGest = document.getElementById("btn_toggle_mod_gestante");
+  if (btnGest) btnGest.classList.remove("active");
+}
+window.resetearModificadoresYSubsecciones = resetearModificadoresYSubsecciones;
 
 
 // ---------------------------------------------------------------------------
@@ -3448,8 +3514,23 @@ function validarSignosVitalesEnVivo() {
       continue;
     }
 
-    // Nivel 1: Error de digitación física
-    if (val < def.min || val > def.max) {
+    // Detección ergonómica matemática de entrada en proceso de digitación para TODOS los indicadores (Glasgow '1', Glucosa '6', Temp '3', etc.)
+    const esCampoActivo = (typeof document !== "undefined" && document.activeElement === el);
+    let esPrefijoIncompleto = false;
+    if (esCampoActivo && val > 0 && val < def.min && val <= def.max) {
+      const rawClean = raw.replace(".", "");
+      const maxDigitos = String(Math.floor(def.max)).length;
+      if (rawClean.length < maxDigitos) {
+        const menorFuturo = val * 10;
+        const mayorFuturo = (val * 10) + 9.99;
+        if (menorFuturo <= def.max && mayorFuturo >= def.min) {
+          esPrefijoIncompleto = true;
+        }
+      }
+    }
+
+    // Nivel 1: Error de digitación física (solo bloquea si supera max o si el valor completado no es un prefijo válido y es < min)
+    if (val > def.max || (!esPrefijoIncompleto && val < def.min)) {
       const msg = `${def.nombre} = ${val} ${def.unidad} fuera del límite biológico posible (${def.min} a ${def.max} ${def.unidad}).`;
       marcarCampoError(el, card, errBox, msg);
       errores.push(msg);
@@ -3478,7 +3559,9 @@ function validarSignosVitalesEnVivo() {
     const pas = parseFloat(elPas.value.trim().replace(",", "."));
     const pad = parseFloat(elPad.value.trim().replace(",", "."));
     if (!isNaN(pas) && !isNaN(pad) && pas > 0 && pad > 0) {
-      if (pad >= pas) {
+      // Si el usuario está tecleando activamente en PAS y aún no completa los 3 dígitos (ej: escribió '1' o '12' mientras PAD es '80'):
+      const esPasEnDigitacion = (typeof document !== "undefined" && document.activeElement === elPas && String(pas).length < 3 && pas < pad);
+      if (!esPasEnDigitacion && pad >= pas) {
         const msg = `PA Diastólica (${pad} mmHg) no puede ser mayor o igual a Sistólica (${pas} mmHg).`;
         marcarCampoError(elPad, cardPad, errPad, msg);
         errores.push(msg);
@@ -3550,19 +3633,34 @@ function marcarCampoError(el, card, errBox, mensaje) {
 function mostrarErrorBiologicoEnPrioridad(errores) {
   const pd = document.getElementById("prioridad_display");
   if (!pd) return;
+  const pContent = document.getElementById("prio_display_content");
+  const pError = document.getElementById("prio_display_error");
+  const pLista = document.getElementById("prio_error_lista");
+
+  pd.style.display = "block";
   pd.style.background = "#fee2e2";
   pd.style.borderColor = "#dc2626";
-  pd.innerHTML = `
-    <div style="color:#991b1b;font-weight:800;font-size:16px;">
-      ⛔ EVALUACIÓN BLOQUEADA: DIGITACIÓN BIOLÓGICAMENTE IMPOSIBLE
-    </div>
-    <div style="color:#7f1d1d;font-size:13px;margin-top:6px;text-align:left;">
-      Corrija los campos señalados en rojo para habilitar el algoritmo de Triaje:
-      <ul style="margin:4px 0 0 16px;">
-        ${errores.map(e => `<li>${e}</li>`).join("")}
-      </ul>
-    </div>
-  `;
+  pd.style.borderWidth = "2px";
+
+  if (pContent && pError && pLista) {
+    pContent.style.display = "none";
+    pError.style.display = "block";
+    pLista.innerHTML = errores.map(e => `<li>${e}</li>`).join("");
+  } else {
+    pd.innerHTML = `
+      <div id="prio_display_error" style="color:#7f1d1d;text-align:left;">
+        <div style="color:#991b1b;font-weight:800;font-size:15px;margin-bottom:6px;">
+          ⛔ EVALUACIÓN BLOQUEADA: DIGITACIÓN BIOLÓGICAMENTE IMPOSIBLE
+        </div>
+        <div style="font-size:12.5px;">
+          Corrija los campos señalados en rojo para habilitar el algoritmo de Triaje:
+          <ul id="prio_error_lista" style="margin:4px 0 0 16px;font-weight:600;">
+            ${errores.map(e => `<li>${e}</li>`).join("")}
+          </ul>
+        </div>
+      </div>
+    `;
+  }
 }
 
 function cargarPresetVitales(tipo) {
@@ -3820,7 +3918,7 @@ function calcularCTAS(params = {}) {
   if (eva !== null && eva >= 8) {
     motivos2.push(`Dolor severo agudo EVA ${eva}/10 (CTAS 2)`);
   }
-  if (glucosa !== null && (glucosa < 54 || (glucosa >= 250 && glucosa <= 324 && (fr !== null && fr >= 22)))) {
+  if (glucosa !== null && (glucosa < 54 || glucosa >= 500 || (glucosa >= 250 && glucosa <= 324 && (fr !== null && fr >= 22)))) {
     motivos2.push(`Desbalance metabólico agudo Glucemia ${glucosa} mg/dL (Sospecha CAD)`);
   }
   if (claveObst === "amarilla" || (esGestante && ((pas !== null && pas >= 160) || (pad !== null && pad >= 110)))) {
@@ -3957,7 +4055,7 @@ function evaluarTriajeEstandar(datos = {}) {
 }
 window.evaluarTriajeEstandar = evaluarTriajeEstandar;
 
-// Validación y resaltado de bordes en vivo para signos vitales
+// Validación y resaltado de bordes en vivo para signos vitales (Calm-Tech & IEC 62366-1)
 function validarAlertaVitalEnVivo(param, valor) {
   const num = parseFloat(valor);
   const el = document.getElementById(param + "_full");
@@ -3967,6 +4065,20 @@ function validarAlertaVitalEnVivo(param, valor) {
   if (isNaN(num) || valor === "" || valor === null) return;
 
   const esPediatrico = Boolean(document.getElementById("check_pediatrico")?.checked);
+  const rawStr = String(valor).trim();
+  const esActivo = (typeof document !== "undefined" && document.activeElement === el);
+
+  // Evitar falsas alarmas visuales (parpadeo rojo) mientras el usuario está escribiendo valores de múltiples dígitos:
+  if (esActivo) {
+    if (param === "fc" && rawStr.length < 2) return;
+    if (param === "pas" && rawStr.length < 3) return;
+    if (param === "pad" && rawStr.length < 2) return;
+    if (param === "fr" && rawStr.length < 2) return;
+    if (param === "spo2" && rawStr.length < 2) return;
+    if (param === "temp" && rawStr.replace(".", "").length < 2) return;
+    if (param === "glasgow" && rawStr === "1") return; // 10–15 inicia con el dígito 1
+    if (param === "glucosa" && rawStr.length < 2) return;
+  }
 
   if (param === "spo2") {
     if (num < 90) el.classList.add("input-critical-alert");
@@ -4080,17 +4192,35 @@ window.actualizarTooltipsVitalesDinamicos = actualizarTooltipsVitalesDinamicos;
 
 function toggleSeccionMod2do(tipo) {
   const boxMain = document.getElementById("box_modificadores_segundo_orden");
-  if (boxMain) boxMain.style.display = "block";
+  const icon = document.getElementById("icon_mod2do");
+  if (!boxMain) return;
+
   if (tipo === "glucosa") {
+    const isVisible = (boxMain.style.display !== "none" && boxMain.style.display !== "");
     const elGluc = document.getElementById("glucosa_full");
-    if (elGluc) elGluc.focus();
+    if (!isVisible) {
+      boxMain.style.display = "block";
+      if (icon) icon.textContent = "➖";
+      if (elGluc) elGluc.focus();
+    } else {
+      if (elGluc && document.activeElement !== elGluc) {
+        elGluc.focus();
+      } else {
+        boxMain.style.display = "none";
+        if (icon) icon.textContent = "➕";
+      }
+    }
   } else if (tipo === "pediatrico") {
+    boxMain.style.display = "block";
+    if (icon) icon.textContent = "➖";
     const chk = document.getElementById("check_pediatrico");
     if (chk) {
       chk.checked = !chk.checked;
       togglePediatrico(chk.checked);
     }
   } else if (tipo === "gestante") {
+    boxMain.style.display = "block";
+    if (icon) icon.textContent = "➖";
     const chk = document.getElementById("check_gestante");
     if (chk) {
       chk.checked = !chk.checked;
@@ -4160,8 +4290,16 @@ window.seleccionarMotivoCedis = seleccionarMotivoCedis;
 // ===========================================================================
 function limpiarPrioridadUI() {
   const pDisp = document.getElementById("prioridad_display");
+  const pContent = document.getElementById("prio_display_content");
+  const pError = document.getElementById("prio_display_error");
+  if (pError) pError.style.display = "none";
+  if (pContent) pContent.style.display = "block";
+
   if (pDisp) {
     pDisp.style.display = "none";
+    pDisp.style.background = "";
+    pDisp.style.borderColor = "";
+    pDisp.style.borderWidth = "";
     pDisp.classList.remove("visible", "prio-I", "prio-II", "prio-III", "prio-IV", "prio-V");
   }
   const pCard = document.getElementById("prio_result_card");
@@ -4242,6 +4380,17 @@ function recalcularPrioridad() {
       mostrarErrorBiologicoEnPrioridad(validacion.errores);
     }
     return;
+  } else {
+    const pContent = document.getElementById("prio_display_content");
+    const pError = document.getElementById("prio_display_error");
+    if (pError) pError.style.display = "none";
+    if (pContent) pContent.style.display = "block";
+    const pd = document.getElementById("prioridad_display");
+    if (pd && pd.style.borderColor === "rgb(220, 38, 38)") {
+      pd.style.background = "";
+      pd.style.borderColor = "";
+      pd.style.borderWidth = "";
+    }
   }
 
   const spo2 = parseVital("spo2_full");
@@ -4544,6 +4693,11 @@ function mostrarPrioridad(prio, detalle) {
   const pd = document.getElementById("prioridad_display");
   const def = PRIORIDADES[prio];
   if (!def) return;
+
+  const pContent = document.getElementById("prio_display_content");
+  const pError = document.getElementById("prio_display_error");
+  if (pError) pError.style.display = "none";
+  if (pContent) pContent.style.display = "block";
 
   pd.className = `prioridad-display visible prioridad-${prio}`;
   pd.style.background = "";
@@ -6753,21 +6907,19 @@ function moduloSiguiente() {
 }
 
 
-// Inicializar todos los módulos colapsados por defecto en el primer render
+// Inicializar todos los módulos colapsados por defecto en el primer render (todas las pestañas no desglosadas)
 document.addEventListener("DOMContentLoaded", () => {
   if (typeof cerrarTodosLosModulos === "function") {
     cerrarTodosLosModulos();
   }
-  moduloActivoActual = 1;
-  const b1 = document.getElementById("body_mod1");
-  const a1 = document.getElementById("arrow_mod1");
-  if (b1) {
-    b1.classList.add("open");
-    b1.style.display = "block";
+  if (typeof resetearModificadoresYSubsecciones === "function") {
+    resetearModificadoresYSubsecciones();
   }
-  if (a1) a1.classList.add("open");
-  const btnTop = document.getElementById("btnStepTop_1");
-  if (btnTop) btnTop.classList.add("active");
+  moduloActivoActual = null;
+  for (let i = 1; i <= 8; i++) {
+    const btnTop = document.getElementById(`btnStepTop_${i}`);
+    if (btnTop) btnTop.classList.remove("active");
+  }
 });
 
 
@@ -9935,7 +10087,8 @@ function capturarFormularioActual() {
     "pas_full", "pad_full", "fr_full", "temp_full", "glasgow_full", "glucosa_full",
     "eva_full", "eva_range", "edad_full", "sexo_full", "fecha_nac_full",
     "check_cod_infarto", "check_cod_ictus", "check_cod_sepsis",
-    "chk_gestante_full", "chk_pediatrico_full", "clave_obstetrica_sel",
+    "check_pediatrico", "check_gestante", "chk_tep_apariencia", "chk_tep_respiracion", "chk_tep_circulacion",
+    "clave_obstetrica_sel", "sem_gestacion", "lcf_gestacion", "sel_grupo_pediatrico",
     "enfermero_triaje_select", "alergias_full", "chk_consentimiento_datos",
     "chk_evento_fuga", "chk_exclusion_eps", "sel_consentimiento_medico",
     "cie10_select", "cie10_input", "dni_mod1", "dni_mod4",
@@ -9948,6 +10101,8 @@ function capturarFormularioActual() {
       inputs[id] = (el.type === "checkbox") ? el.checked : el.value;
     }
   });
+  const boxMod = document.getElementById("box_modificadores_segundo_orden");
+  inputs["_box_mod_abierto"] = Boolean(boxMod && boxMod.style.display !== "none" && boxMod.style.display !== "");
   return inputs;
 }
 
@@ -9967,6 +10122,39 @@ function aplicarFormulario(inputs) {
   if (!isNaN(evaVal) && typeof actualizarEVA === "function") {
     actualizarEVA(evaVal);
   }
+  if (inputs["_box_mod_abierto"]) {
+    const boxMod = document.getElementById("box_modificadores_segundo_orden");
+    if (boxMod) boxMod.style.display = "block";
+    const iconMod = document.getElementById("icon_mod2do");
+    if (iconMod) iconMod.textContent = "➖";
+  } else {
+    const boxMod = document.getElementById("box_modificadores_segundo_orden");
+    if (boxMod) boxMod.style.display = "none";
+    const iconMod = document.getElementById("icon_mod2do");
+    if (iconMod) iconMod.textContent = "➕";
+  }
+  if (inputs["check_pediatrico"]) {
+    const boxPed = document.getElementById("box_pediatrico_detalles");
+    if (boxPed) boxPed.style.display = "block";
+  }
+  if (inputs["check_gestante"]) {
+    const boxGest = document.getElementById("box_gestante");
+    if (boxGest) boxGest.style.display = "block";
+  }
+  ["apariencia", "respiracion", "circulacion"].forEach(lado => {
+    const card = document.getElementById(`card_tep_${lado}`);
+    if (card) {
+      if (inputs[`chk_tep_${lado}`]) card.classList.add("checked");
+      else card.classList.remove("checked");
+    }
+  });
+  ["infarto", "ictus", "sepsis"].forEach(cod => {
+    const card = document.getElementById(`card_cod_${cod}`);
+    if (card) {
+      if (inputs[`check_cod_${cod}`]) card.classList.add("checked");
+      else card.classList.remove("checked");
+    }
+  });
 }
 
 function guardarEstadoPacienteActivo() {
@@ -10012,6 +10200,8 @@ function limpiarFormularioCompletoState() {
   if (typeof limpiarCamposParaNuevaAtencion === "function") {
     limpiarCamposParaNuevaAtencion();
   }
+  if (typeof cerrarTodosLosModulos === "function") cerrarTodosLosModulos();
+  if (typeof resetearModificadoresYSubsecciones === "function") resetearModificadoresYSubsecciones();
   if (typeof STATE !== "undefined" && STATE) {
     STATE.estadoFlujo = "PENDIENTE_TRIAJE";
     STATE.firmas = {};
@@ -10632,10 +10822,23 @@ function cambiarPacienteActivo(nuevoId, forzarRehidratacion = false) {
     targetMod = 8;
   }
 
-  if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
-    window.COCKPIT.irAFase(targetFase);
-  } else if (typeof irAModulo === "function") {
-    irAModulo(targetMod);
+  if (flujoPx === "PENDIENTE_TRIAJE" && !nuevoPx.triajeConcluido && !nuevoPx.formSnapshot) {
+    if (typeof cerrarTodosLosModulos === "function") cerrarTodosLosModulos();
+    if (typeof resetearModificadoresYSubsecciones === "function") resetearModificadoresYSubsecciones();
+    moduloActivoActual = null;
+    for (let i = 1; i <= 8; i++) {
+      const btnTop = document.getElementById(`btnStepTop_${i}`);
+      if (btnTop) btnTop.classList.remove("active");
+    }
+    if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
+      window.COCKPIT.irAFase(1);
+    }
+  } else {
+    if (window.COCKPIT && typeof window.COCKPIT.irAFase === "function") {
+      window.COCKPIT.irAFase(targetFase);
+    } else if (typeof irAModulo === "function") {
+      irAModulo(targetMod);
+    }
   }
 
   mostrarToastCola(`👤 Cambiado a: <strong>${nuevoPx.nombre}</strong> (${nuevoPx.identificador})`);
@@ -10647,6 +10850,13 @@ function crearNuevoPacienteEnBlanco() {
   PACIENTES_COLA.push(nuevoPx);
   pacienteActivoId = nuevoPx.id;
   limpiarFormularioCompletoState();
+  if (typeof cerrarTodosLosModulos === "function") cerrarTodosLosModulos();
+  if (typeof resetearModificadoresYSubsecciones === "function") resetearModificadoresYSubsecciones();
+  moduloActivoActual = null;
+  for (let i = 1; i <= 8; i++) {
+    const btnTop = document.getElementById(`btnStepTop_${i}`);
+    if (btnTop) btnTop.classList.remove("active");
+  }
   renderizarTableroColaPacientes();
   mostrarToastCola(`➕ Ficha en blanco creada: <strong>${nuevoPx.nombre}</strong>`);
 }
@@ -11395,8 +11605,15 @@ function registrarPacienteEnEspera() {
   // 7. Renderizar panel lateral de la izquierda con todos los pacientes
   renderizarTableroColaPacientes();
 
-  if (typeof irAModulo === "function") irAModulo(1);
-  mostrarToastCola(`👤 <strong>Nuevo Paciente en Espera:</strong> ${ticketStr} registrado. Ingrese sus datos manualmente.`);
+  // Al empezar nueva atención: todas las pestañas no desglosadas y modificadores cerrados
+  if (typeof cerrarTodosLosModulos === "function") cerrarTodosLosModulos();
+  if (typeof resetearModificadoresYSubsecciones === "function") resetearModificadoresYSubsecciones();
+  moduloActivoActual = null;
+  for (let i = 1; i <= 8; i++) {
+    const btnTop = document.getElementById(`btnStepTop_${i}`);
+    if (btnTop) btnTop.classList.remove("active");
+  }
+  mostrarToastCola(`👤 <strong>Nuevo Paciente en Espera:</strong> ${ticketStr} registrado. Seleccione o desglose el módulo para iniciar.`);
 }
 window.registrarPacienteEnEspera = registrarPacienteEnEspera;
 window.crearRegistroPaciente = crearRegistroPaciente;
@@ -15799,6 +16016,12 @@ function vincularEventosRecalculoDinamicoVitales() {
         if (typeof recalcularPrioridad === "function") recalcularPrioridad();
       });
       el.addEventListener("change", () => {
+        if (typeof recalcularPrioridad === "function") recalcularPrioridad();
+      });
+      el.addEventListener("blur", () => {
+        const param = el.id.replace("_full", "");
+        if (typeof validarAlertaVitalEnVivo === "function") validarAlertaVitalEnVivo(param, el.value);
+        if (typeof validarSignosVitalesEnVivo === "function") validarSignosVitalesEnVivo();
         if (typeof recalcularPrioridad === "function") recalcularPrioridad();
       });
       el._recalculoBound = true;
