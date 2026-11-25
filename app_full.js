@@ -957,8 +957,11 @@ function seleccionarPacienteDeBusqueda(pacienteEncoded) {
 // MODAL DE CATÁLOGO COMPLETO DE HISTORIAS CLÍNICAS
 // ---------------------------------------------------------------------------
 async function abrirModalConsultaHC() {
-  const rolPerm = (typeof rolActivoActual !== "undefined" && rolActivoActual) ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN");
-  if (rolPerm !== "ADMIN" && rolPerm !== "MEDICO") {
+  const rolCockpit = document.getElementById("cockpit_sim_role_select")?.value || (window.RBAC_FLUJO ? window.RBAC_FLUJO.obtenerRolActivo() : "");
+  const rolPerm = (rolCockpit && ["AUDITOR", "ADMIN", "MEDICO", "TRIAJE", "ADMISION", "CAJA"].includes(rolCockpit))
+    ? rolCockpit
+    : ((typeof rolActivoActual !== "undefined" && rolActivoActual) ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN"));
+  if (rolPerm !== "ADMIN" && rolPerm !== "AUDITOR" && rolPerm !== "MEDICO") {
     alert("🔒 Acceso restringido (Ley N° 29733 / NTS N° 139-MINSA): La búsqueda del catálogo de Historias Clínicas solo está habilitada para el Rol de Auditor y Médico.");
     return;
   }
@@ -1460,6 +1463,55 @@ window.ingresarNNInconsciente = ingresarNNInconsciente;
 window.ingresarPacienteNN = ingresarNNConsciente;
 window.admitirEmergenciaNN = ingresarNNInconsciente;
 
+function abrirModalIngresoNN() {
+  const m = document.getElementById("modal_ingreso_nn");
+  if (!m) { ingresarNNConsciente(); return; }
+  const rConsc = document.querySelector('input[name="nn_estado_conciencia"][value="consciente"]');
+  const rReg = document.querySelector('input[name="nn_ruta_prioridad"][value="regular"]');
+  if (rConsc) rConsc.checked = true;
+  if (rReg) rReg.checked = true;
+  m.classList.add("open");
+  m.classList.add("show");
+  m.style.setProperty("display", "flex", "important");
+}
+window.abrirModalIngresoNN = abrirModalIngresoNN;
+
+function cerrarModalIngresoNN() {
+  const m = document.getElementById("modal_ingreso_nn");
+  if (!m) return;
+  m.classList.remove("open");
+  m.classList.remove("show");
+  m.style.setProperty("display", "none", "important");
+}
+window.cerrarModalIngresoNN = cerrarModalIngresoNN;
+
+function confirmarIngresoNNModal() {
+  const estado = document.querySelector('input[name="nn_estado_conciencia"]:checked')?.value || "consciente";
+  const ruta = document.querySelector('input[name="nn_ruta_prioridad"]:checked')?.value || "regular";
+  cerrarModalIngresoNN();
+  STATE.nnEstadoConciencia = estado;
+  STATE.nnRutaPrioridad = ruta;
+  if (ruta === "inmediata") {
+    ingresarNNInconsciente();
+    if (estado === "consciente") {
+      const elMot = document.getElementById("motivo_full");
+      if (elMot) elMot.value = "Paciente NN Consciente — Atención Inmediata Prioridad I (Ley N° 27604)";
+      STATE.motivoConsulta = "Paciente NN Consciente — Atención Inmediata Prioridad I (Ley N° 27604)";
+    }
+  } else {
+    ingresarNNConsciente();
+    if (estado === "inconsciente") {
+      const elMot = document.getElementById("motivo_full");
+      if (elMot) elMot.value = "Paciente NN Inconsciente — Derivado a Evaluación de Triaje";
+      STATE.motivoConsulta = "Paciente NN Inconsciente — Derivado a Evaluación de Triaje";
+    }
+  }
+  if (typeof registrarLogAuditoria === "function") {
+    registrarLogAuditoria("Admisión NN", "INGRESO_NN_UNIFICADO", `Estado: ${estado.toUpperCase()} | Prioridad/Ruta: ${ruta.toUpperCase()}`);
+  }
+}
+window.confirmarIngresoNNModal = confirmarIngresoNNModal;
+
 // PROTOCOLO DE INGRESO DE PACIENTES NN (IDENTIDAD NO CONFIRMADA)
 // ---------------------------------------------------------------------------
 function ingresarPacienteNN() {
@@ -1782,6 +1834,9 @@ function visualizarHistoriaClinica(pacienteEncoded) {
   const admisionista = master.admisionista || pxCola?.firmas?.admision?.usuario || (esActivo && STATE.admisionista ? STATE.admisionista : "") || "—";
   const formaLlegada = master.forma_llegada || pxCola?.formaLlegada || (esActivo ? STATE.formaLlegada : "") || "—";
   const fechaNac = master.fecha_nacimiento || (esActivo ? STATE.fechaNacimiento : "") || "—";
+  const grupoSang = master.grupo_sanguineo || (esActivo && STATE.grupoSanguineo ? STATE.grupoSanguineo : "") || "—";
+  const factorRh = master.factor_rh || (esActivo && STATE.factorRh ? STATE.factorRh : "") || "—";
+  const gsRhTxt = (grupoSang !== "—" || factorRh !== "—") ? `${grupoSang} ${factorRh !== "—" ? factorRh : ""}`.trim() : "—";
   const direccion = master.direccion || (esActivo ? STATE.direccion : "") || "—";
   const telefono = master.telefono || (esActivo ? STATE.telefono : "") || "—";
   const contactoEmerg = master.contacto_emergencia || "—";
@@ -1811,7 +1866,11 @@ function visualizarHistoriaClinica(pacienteEncoded) {
     ? Object.entries(master.campos_personalizados).map(([ck, cv]) => `<div><strong>${ck}:</strong> ${cv}</div>`).join("")
     : "";
 
-  const esRolAuditor = (typeof rolActivoActual !== "undefined" ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN")) === "ADMIN";
+  const rolCockpitModal = document.getElementById("cockpit_sim_role_select")?.value || "";
+  const rolEfectivoModal = (rolCockpitModal && ["AUDITOR", "ADMIN", "MEDICO", "TRIAJE", "ADMISION", "CAJA"].includes(rolCockpitModal))
+    ? rolCockpitModal
+    : (typeof rolActivoActual !== "undefined" ? rolActivoActual : (document.getElementById("selector_rol_sistema")?.value || "ADMIN"));
+  const esRolAuditor = (rolEfectivoModal === "ADMIN" || rolEfectivoModal === "AUDITOR");
   const bloqueFormularioAuditor = esRolAuditor ? `
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
         <h4 style="margin:0;font-size:0.9rem;font-weight:900;color:#92400e;">✏️ Modificación Auditada de Cualquier Campo (Solo Auditor)</h4>
@@ -1838,6 +1897,8 @@ function visualizarHistoriaClinica(pacienteEncoded) {
               <option value="forma_llegada">Forma de Llegada / Ingreso</option>
             </optgroup>
             <optgroup label="Alergias y Antecedentes">
+              <option value="grupo_sanguineo">Grupo Sanguíneo (GS)</option>
+              <option value="factor_rh">Factor Rh</option>
               <option value="alergias">Alergias Medicamentosas</option>
               <option value="antecedentes_personales">Antecedentes Personales / Patológicos</option>
               <option value="antecedentes_familiares">Antecedentes Familiares</option>
@@ -1901,6 +1962,7 @@ function visualizarHistoriaClinica(pacienteEncoded) {
         <div><strong>DNI / Identificador:</strong> <code style="background:#ffffff;padding:2px 6px;border-radius:4px;border:1px solid #e2e8f0;">${master.identificador || ident}</code></div>
         <div><strong>Seguro / IAFAS:</strong> <span class="hc-pill-seguro">${seguro}</span></div>
         <div><strong>Edad / Sexo:</strong> ${master.edad ? `${master.edad} años` : "—"} (${master.sexo === "F" ? "Femenino" : (master.sexo === "M" ? "Masculino" : "—")})</div>
+        <div><strong>Grupo Sanguíneo / Rh:</strong> <strong style="color:${factorRh.includes("Negativo") ? "#b91c1c" : "#0f172a"};">${gsRhTxt}</strong></div>
         <div><strong>Fecha Nac.:</strong> ${fechaNac}</div>
         <div><strong>Teléfono:</strong> ${telefono}</div>
         <div><strong>Dirección:</strong> ${direccion}</div>
@@ -2087,6 +2149,8 @@ async function registrarModificacionAuditorHC(ident, hc, nom, seg) {
     contacto_emergencia: "Contacto de Emergencia",
     tipo_seguro: "Seguro / IAFAS",
     forma_llegada: "Forma de Llegada",
+    grupo_sanguineo: "Grupo Sanguíneo (GS)",
+    factor_rh: "Factor Rh",
     alergias: "Alergias Medicamentosas",
     antecedentes_personales: "Antecedentes Personales",
     antecedentes_familiares: "Antecedentes Familiares",
@@ -2186,6 +2250,9 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
   const admisionista = master.admisionista || pxCola?.firmas?.admision?.usuario || (esActivo && STATE.admisionista ? STATE.admisionista : "") || "—";
   const formaLlegada = master.forma_llegada || pxCola?.formaLlegada || (esActivo ? STATE.formaLlegada : "") || "—";
   const fechaNac = master.fecha_nacimiento || (esActivo ? STATE.fechaNacimiento : "") || "—";
+  const grupoSang = master.grupo_sanguineo || (esActivo && STATE.grupoSanguineo ? STATE.grupoSanguineo : "") || "—";
+  const factorRh = master.factor_rh || (esActivo && STATE.factorRh ? STATE.factorRh : "") || "—";
+  const gsRhTxt = (grupoSang !== "—" || factorRh !== "—") ? `${grupoSang} ${factorRh !== "—" ? factorRh : ""}`.trim() : "—";
   const direccion = master.direccion || (esActivo ? STATE.direccion : "") || "—";
   const telefono = master.telefono || (esActivo ? STATE.telefono : "") || "—";
   const contactoEmerg = master.contacto_emergencia || "—";
@@ -2345,6 +2412,7 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
           <div class="field"><label>DNI / Identificador</label><span>${master.identificador || ident}</span></div>
           <div class="field"><label>Edad / Sexo</label><span>${master.edad ? `${master.edad} años` : "—"} (${master.sexo || "—"})</span></div>
           <div class="field"><label>Seguro / IAFAS</label><span>${seguro}</span></div>
+          <div class="field"><label>Grupo Sanguíneo / Rh</label><span>${gsRhTxt}</span></div>
           <div class="field"><label>Fecha de Nacimiento</label><span>${fechaNac}</span></div>
           <div class="field"><label>Teléfono</label><span>${telefono}</span></div>
           <div class="field"><label>Dirección</label><span>${direccion}</span></div>
@@ -10959,6 +11027,8 @@ function limpiarFormularioCompletoState() {
     STATE.horaLlegada = null;
     STATE.fechaLlegada = null;
     STATE.esNN = false;
+    STATE.grupoSanguineo = "";
+    STATE.factorRh = "";
   }
 
   const inputsIds = [
@@ -10967,7 +11037,8 @@ function limpiarFormularioCompletoState() {
     "eva_full", "eva_range", "edad_full", "sexo_full", "fecha_nac_full", "alergias_full", "alergias_mod1",
     "cie10_select", "cie10_input", "enfermero_triaje_select", "medico_responsable_select",
     "select_ipress_publica", "select_plan_privado", "sel_consentimiento_medico",
-    "sel_condicion_consentimiento", "sel_procedimiento_consentimiento"
+    "sel_condicion_consentimiento", "sel_procedimiento_consentimiento",
+    "select_grupo_sanguineo", "select_factor_rh"
   ];
   inputsIds.forEach(id => {
     const el = document.getElementById(id);
@@ -16460,6 +16531,45 @@ function actualizarProcedimientoConsentimiento(proc) {
   }
 }
 window.actualizarProcedimientoConsentimiento = actualizarProcedimientoConsentimiento;
+
+function actualizarGrupoYFactorRh() {
+  const gs = document.getElementById("select_grupo_sanguineo")?.value || "";
+  const rh = document.getElementById("select_factor_rh")?.value || "";
+  if (typeof STATE !== "undefined" && STATE) {
+    STATE.grupoSanguineo = gs;
+    STATE.factorRh = rh;
+  }
+  const badge = document.getElementById("badge_gs_rh_estado");
+  if (badge) {
+    badge.textContent = (gs || rh) ? `${gs || "?"} ${rh || "Rh por tipificar"}`.trim() : "Por tipificar / Confirmar";
+  }
+  const alerta = document.getElementById("alerta_rh_negativo");
+  if (alerta) {
+    alerta.style.display = rh.includes("Negativo") ? "block" : "none";
+  }
+  if (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA) && typeof pacienteActivoId !== "undefined") {
+    const pxActivo = PACIENTES_COLA.find(x => x.id === pacienteActivoId);
+    if (pxActivo && pxActivo.stateSnapshot) {
+      pxActivo.stateSnapshot.grupoSanguineo = gs;
+      pxActivo.stateSnapshot.factorRh = rh;
+    }
+  }
+  const ident = STATE?.numDni || STATE?.identificador || "";
+  const hc = STATE?.historiaClinica || "";
+  if ((ident || hc) && typeof cargarPacientesMaster === "function" && typeof guardarPacientesMaster === "function") {
+    const allM = cargarPacientesMaster();
+    const key = (ident && !String(ident).startsWith("NN-")) ? String(ident).trim().toUpperCase() : String(hc).trim().toUpperCase();
+    if (key && allM[key]) {
+      allM[key].grupo_sanguineo = gs || "—";
+      allM[key].factor_rh = rh || "—";
+      guardarPacientesMaster(allM);
+    }
+  }
+  if (typeof registrarLogAuditoria === "function" && (gs || rh)) {
+    registrarLogAuditoria("Módulo 4", "INMUNOHEMATOLOGIA_GS_RH", `Grupo Sanguíneo: ${gs || "—"} | Factor Rh: ${rh || "—"}`);
+  }
+}
+window.actualizarGrupoYFactorRh = actualizarGrupoYFactorRh;
 
 function toggleConsentimientoFirmado(checked) {
   STATE.consentimientoAdjuntoHC = Boolean(checked);

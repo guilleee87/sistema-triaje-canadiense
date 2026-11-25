@@ -2670,11 +2670,8 @@
           <button type="button" class="btn-caos-action btn-quirofano-action" onclick="activarIngresoDirectoQuirofano()" title="Admisión Inmediata de Emergencia a Quirófano SOP (Ley N° 27604)" style="background: linear-gradient(135deg, #7c2d12 0%, #ea580c 100%); color: #ffffff; font-weight: 800; border: 1px solid #9a3412; box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);">
             🏥 Admitir Emergencia Quirófano SOP (P-I)
           </button>
-          <button type="button" class="btn-caos-action" onclick="ingresarNNConsciente()" title="Admisión de Paciente NN Consciente / Indocumentado (Pasa a Evaluación de Triaje)" style="background:#f0f9ff; color:#0369a1; border:1.5px solid #bae6fd; font-weight:800;">
-            👤 NN Consciente (Evaluación)
-          </button>
-          <button type="button" class="btn-caos-action btn-nn-action" onclick="ingresarNNInconsciente()" title="Admisión Inmediata de Paciente NN Inconsciente a Shock Trauma (Ley N° 27604)">
-            🚨 NN Inconsciente (Inmediata P-I)
+          <button type="button" id="btn_ingreso_nn_unico" class="btn-caos-action btn-nn-action" onclick="abrirModalIngresoNN()" title="Ingreso de Paciente NN / Indocumentado (Elegir estado de conciencia y prioridad)">
+            👤 Ingresar Paciente NN
           </button>
           <button type="button" class="btn-caos-action btn-soat-action" onclick="admitirEmergenciaSoat()" title="Protocolo de Emergencia Accidente de Tránsito / Trauma Vial (Ley N° 27181 & D.S. N° 024-2002-MTC)" style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #ffffff; font-weight: 800; border: 1px solid #075985; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
             🚗 Accidente de Tránsito / Trauma Vial (SOAT)
@@ -3483,11 +3480,8 @@
             <div style="font-size:0.75rem; color:#9a3412;">Abre Historia Temporal, deja en blanco fecha/edad sin bloquear el flujo y emite oficio legal a PNP.</div>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn-full-secondary" style="border:2px solid #0284c7; background:#f0f9ff; color:#0369a1; font-weight:800; padding:8px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;" onclick="ingresarNNConsciente()" title="1. Paciente NN Consciente (Pasa a Evaluación de Triaje regular)">
-              <span>👤</span> <span>1. NN Consciente (A Evaluación)</span>
-            </button>
-            <button type="button" class="btn-full-primary" style="background:linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); border:1.5px solid #991c1c; color:#ffffff; font-weight:800; padding:8px 14px; border-radius:8px; box-shadow:0 2px 6px rgba(185,28,28,0.25); display:inline-flex; align-items:center; gap:6px;" onclick="ingresarNNInconsciente()" title="2. Paciente NN Inconsciente (Pase Directo a Shock Trauma P-I Ley N° 27604)">
-              <span>🚨</span> <span>2. NN Inconsciente (Atención Inmediata P-I)</span>
+            <button type="button" id="btn_mod2_ingresar_nn_unico" class="btn-full-primary" style="background:linear-gradient(135deg, #c2410c 0%, #ea580c 100%); border:1.5px solid #9a3412; color:#ffffff; font-weight:800; padding:8px 16px; border-radius:8px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onclick="abrirModalIngresoNN()" title="Ingreso de Paciente NN / Indocumentado (Elegir estado de conciencia y prioridad)">
+              <span>👤</span> <span>Ingresar Paciente NN</span>
             </button>
             <button type="button" class="btn-full-secondary" id="btn_notif_pnp" style="display:none;" onclick="imprimirAlertaNN()">
               📄 Acta PNP / Servicio Social
@@ -4010,6 +4004,42 @@
                 🩺 Asignar Disponible
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- INMUNOHEMATOLOGÍA: GRUPO SANGUÍNEO (GS) Y FACTOR RH (NTS N° 139-MINSA / BANCO DE SANGRE) -->
+        <div id="card_gs_rh_mod4" style="background:#fff1f2; border:1.5px solid #fecdd3; border-radius:10px; padding:12px 16px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+            <div style="font-size:0.86rem; font-weight:800; color:#9f1239; display:flex; align-items:center; gap:6px;">
+              <span>🩸</span>
+              <span>Inmunohematología: Grupo Sanguíneo (GS) y Factor Rh</span>
+            </div>
+            <span id="badge_gs_rh_estado" style="font-size:0.74rem; font-weight:800; background:#ffffff; color:#9f1239; border:1px solid #fda4af; padding:2px 8px; border-radius:6px;">
+              Por tipificar / Confirmar
+            </span>
+          </div>
+          <div class="form-grid-2" style="margin-bottom:0;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="select_grupo_sanguineo" style="font-weight:700; color:#881337;">Grupo Sanguíneo (GS):</label>
+              <select id="select_grupo_sanguineo" class="input-full" onchange="actualizarGrupoYFactorRh()" style="font-weight:700;">
+                <option value="">Por tipificar / Desconocido</option>
+                <option value="O">Grupo O</option>
+                <option value="A">Grupo A</option>
+                <option value="B">Grupo B</option>
+                <option value="AB">Grupo AB</option>
+              </select>
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="select_factor_rh" style="font-weight:700; color:#881337;">Factor Rh:</label>
+              <select id="select_factor_rh" class="input-full" onchange="actualizarGrupoYFactorRh()" style="font-weight:700;">
+                <option value="">Por tipificar / Desconocido</option>
+                <option value="Positivo (Rh+)">Positivo (Rh+)</option>
+                <option value="Negativo (Rh-)">Negativo (Rh-)</option>
+              </select>
+            </div>
+          </div>
+          <div id="alerta_rh_negativo" style="display:none; margin-top:8px; font-size:0.76rem; font-weight:800; color:#991b1b; background:#fee2e2; border:1px solid #ef4444; border-radius:6px; padding:6px 10px;">
+            ⚠️ <strong>ALERTA BANCO DE SANGRE:</strong> Paciente <strong>Factor Rh Negativo (Rh-)</strong>. Coordinar reserva compatible y prueba cruzada previa antes de transfusión.
           </div>
         </div>
 
@@ -5430,6 +5460,60 @@
 
   <!-- BRAZALETE IMPRIMIBLE OCULTO -->
   <div class="brazalete-print" id="brazalete_print_area" style="display:none;"></div>
+
+  <!-- MODAL: INGRESO UNIFICADO DE PACIENTE NN (CONSCIENCIA + PRIORIDAD) -->
+  <div class="modal-hc-overlay" id="modal_ingreso_nn" style="display:none;" onclick="if(event.target===this)cerrarModalIngresoNN()">
+    <div class="modal-hc-container" style="max-width:520px; width:94%;">
+      <div class="modal-hc-header" style="background:#9a3412;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:1.3rem;">👤</span>
+          <div>
+            <h3 style="margin:0; font-size:1.02rem; font-weight:800;">Ingreso de Paciente NN (Ley N° 27604)</h3>
+            <div style="font-size:0.74rem; color:#fed7aa;">Seleccione el estado de conciencia y la prioridad de ingreso</div>
+          </div>
+        </div>
+        <button type="button" onclick="cerrarModalIngresoNN()" style="background:none; border:none; color:#ffffff; font-size:1.4rem; cursor:pointer;">✕</button>
+      </div>
+      <div class="modal-hc-body" style="padding:18px 20px;">
+        <div style="margin-bottom:16px;">
+          <label style="display:block; font-size:0.84rem; font-weight:800; color:#0f172a; margin-bottom:8px;">1. Estado de Conciencia del Paciente NN:</label>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <label style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1.5px solid #cbd5e1; border-radius:8px; cursor:pointer; background:#f8fafc; font-weight:700; font-size:0.84rem;">
+              <input type="radio" name="nn_estado_conciencia" value="consciente" checked onchange="if(this.checked){ const r=document.querySelector('input[name=nn_ruta_prioridad][value=regular]'); if(r) r.checked=true; }">
+              <span>🟢 Consciente</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; padding:10px 12px; border:1.5px solid #fecaca; border-radius:8px; cursor:pointer; background:#fff1f2; font-weight:700; font-size:0.84rem; color:#991b1b;">
+              <input type="radio" name="nn_estado_conciencia" value="inconsciente" onchange="if(this.checked){ const r=document.querySelector('input[name=nn_ruta_prioridad][value=inmediata]'); if(r) r.checked=true; }">
+              <span>🔴 Inconsciente</span>
+            </label>
+          </div>
+        </div>
+        <div style="margin-bottom:18px;">
+          <label style="display:block; font-size:0.84rem; font-weight:800; color:#0f172a; margin-bottom:8px;">2. Prioridad y Ruta de Atención:</label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1.5px solid #fca5a5; border-radius:8px; cursor:pointer; background:#fef2f2;">
+              <input type="radio" name="nn_ruta_prioridad" value="inmediata" style="margin-top:3px;">
+              <div>
+                <div style="font-weight:800; font-size:0.84rem; color:#991b1b;">🚨 Atención Inmediata (Prioridad I — Shock Trauma)</div>
+                <div style="font-size:0.74rem; color:#b91c1c;">Pase directo a Trauma Shock sin esperar cola regular (Ley N° 27604).</div>
+              </div>
+            </label>
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1.5px solid #bae6fd; border-radius:8px; cursor:pointer; background:#f0f9ff;">
+              <input type="radio" name="nn_ruta_prioridad" value="regular" checked style="margin-top:3px;">
+              <div>
+                <div style="font-weight:800; font-size:0.84rem; color:#0369a1;">📋 Flujo Regular de Triaje (Evaluación CTAS)</div>
+                <div style="font-size:0.74rem; color:#0284c7;">Ingresa al flujo regular de Triaje Fisiológico (Módulo 1) para clasificar prioridad I–V.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #e2e8f0; padding-top:12px;">
+          <button type="button" class="btn-full-secondary" onclick="cerrarModalIngresoNN()">Cancelar</button>
+          <button type="button" id="btn_confirmar_ingreso_nn" class="btn-full-primary" style="background:#c2410c;" onclick="confirmarIngresoNNModal()">✓ Confirmar Ingreso NN</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- MODAL: VISOR / IMPRESIÓN OFICIAL DE CONSENTIMIENTO INFORMADO (NTS N° 139-MINSA) -->
   <div class="modal-hc-overlay" id="modal_consentimiento_informado" style="display:none;">

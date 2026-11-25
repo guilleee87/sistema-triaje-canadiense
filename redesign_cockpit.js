@@ -90,11 +90,8 @@
         <button type="button" class="cockpit-tactical-btn" onclick="activarIngresoDirectoQuirofano()" title="Admisión Directa a Quirófano SOP">
           🏥 Quirófano SOP
         </button>
-        <button type="button" class="cockpit-tactical-btn" onclick="ingresarNNConsciente()" style="border-left:3px solid #0284c7;" title="1. Paciente NN Consciente / Indocumentado (Pasa a Evaluación de Triaje)">
-          👤 NN Consciente
-        </button>
-        <button type="button" class="cockpit-tactical-btn btn-p1-danger" onclick="ingresarNNInconsciente()" style="border-left:3px solid #dc2626;" title="2. Paciente NN Inconsciente / Riesgo Vital Inminente (Atención Inmediata P-I Shock Trauma Ley 27604)">
-          🚨 NN Inconsciente (P-I)
+        <button type="button" id="btn_tactical_ingresar_nn" class="cockpit-tactical-btn" onclick="abrirModalIngresoNN()" style="border-left:3px solid #ea580c; font-weight:800;" title="Ingreso de Paciente NN / Indocumentado (Elegir estado de conciencia y prioridad)">
+          👤 Ingresar Paciente NN
         </button>
         <button type="button" class="cockpit-tactical-btn" onclick="generarEImprimirPulseraInmediata()" style="background:#0f172a; color:#38bdf8; border:1.5px solid #0284c7; font-weight:800;" title="Generar e Imprimir Inmediatamente la Pulsera QR de Emergencia">
           🏷️ Imprimir Pulsera QR
@@ -413,6 +410,11 @@
           🛡️ Rol: AUDITOR
         </span>
 
+        <!-- Botón Historia Clínica (Solo Auditor y Médico) -->
+        <button type="button" id="btn_cockpit_historia_clinica" onclick="abrirModalConsultaHC()" class="cockpit-btn-theme" style="background:#0284c7; color:#ffffff; border-color:#0369a1; font-weight:800; white-space:nowrap; display:inline-flex; align-items:center; gap:5px;" title="Consultar y visualizar la Historia Clínica completa de los pacientes (Solo Auditor y Médico)">
+          📋 Historia Clínica
+        </button>
+
         <!-- Botón Expandir/Contraer Todo (Modo Auditor) -->
         <button type="button" class="cockpit-btn-theme" id="btn_expand_all_modules" onclick="window.COCKPIT.toggleExpandirContraerTodo()" title="Expandir o contraer todas las fases y módulos de una sola vez">
           ⤢ Expandir Todo
@@ -439,6 +441,13 @@
     rol = rol || (window.RBAC_FLUJO ? window.RBAC_FLUJO.obtenerRolActivo() : "AUDITOR");
     modo = modo || (window.RBAC_FLUJO ? window.RBAC_FLUJO.obtenerModoOperacion() : "DEMO");
     rolActivoVista = rol;
+
+    // Visibilidad del botón Historia Clínica en la barra superior (Solo Auditor y Médico)
+    const btnCockpitHC = document.getElementById("btn_cockpit_historia_clinica");
+    if (btnCockpitHC) {
+      const esPermHC = (rol === "AUDITOR" || rol === "ADMIN" || rol === "MEDICO");
+      btnCockpitHC.style.setProperty("display", esPermHC ? "inline-flex" : "none", "important");
+    }
 
     const step1 = document.getElementById("cockpit_step_1");
     const step2 = document.getElementById("cockpit_step_2");
