@@ -12808,8 +12808,8 @@ function sincronizarGsYRhEnModulos(gsVal, rhVal) {
 
   const elGs2 = document.getElementById("gsan_full");
   if (elGs2) {
-    if (gs === "No se acuerda" || rh === "No se acuerda") {
-      elGs2.value = "No se acuerda";
+    if (gs === "No me acuerdo" || rh === "No me acuerdo" || gs === "No se acuerda" || rh === "No se acuerda") {
+      elGs2.value = "No me acuerdo";
     } else if (["O", "A", "B", "AB"].includes(gs) && (rh.includes("+") || rh.includes("-"))) {
       elGs2.value = `${gs}${rh.includes("+") ? "+" : "-"}`;
     } else if (!gs && !rh) {
@@ -12830,9 +12830,9 @@ window.sincronizarGsYRhEnModulos = sincronizarGsYRhEnModulos;
 function actualizarGrupoSanguineo(val) {
   let gs = "";
   let rh = "";
-  if (val === "No se acuerda") {
-    gs = "No se acuerda";
-    rh = "No se acuerda";
+  if (val === "No me acuerdo" || val === "No se acuerda") {
+    gs = "No me acuerdo";
+    rh = "No me acuerdo";
   } else if (val === "Desconocido" || !val) {
     gs = "";
     rh = "";
@@ -14644,9 +14644,9 @@ function construirHTMLBrazalete(esTemporal = false) {
     if (mComb) {
       gsRaw = mComb[1].toUpperCase();
       rhRaw = mComb[2] === "+" ? "Positivo (Rh+)" : "Negativo (Rh-)";
-    } else if (gsanM2 === "No se acuerda") {
-      gsRaw = "No se acuerda";
-      rhRaw = "No se acuerda";
+    } else if (gsanM2 === "No me acuerdo" || gsanM2 === "No se acuerda") {
+      gsRaw = "No me acuerdo";
+      rhRaw = "No me acuerdo";
     }
   }
   const gsDisplay = (gsRaw && gsRaw !== "Desconocido") ? gsRaw : "Por tipificar";
