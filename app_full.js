@@ -1883,6 +1883,7 @@ function visualizarHistoriaClinica(pacienteEncoded) {
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;font-size:0.8rem;color:#475569;">
             <div>🏥 <strong>Cama / Destino:</strong> ${ep.cama_asignada || ep.destino_clinico || "—"}</div>
+            <div>🩺 <strong>Diagnóstico CIE-10:</strong> ${ep.cie10 || (ep.cie10_codigo ? `${ep.cie10_codigo} — ${ep.cie10_descripcion || ""}` : ep.diagnostico) || "—"}</div>
             <div>🔬 <strong>Apoyo Diagnóstico:</strong> ${exms}</div>
             <div>💊 <strong>Farmacia:</strong> ${meds}</div>
             <div>💰 <strong>Facturación:</strong> <span style="font-weight:800;color:${totalPagar === "S/. 0.00" ? "#16a34a" : "#0284c7"};">${totalPagar}</span> (${cobBadge})</div>
@@ -2438,12 +2439,14 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
   if (epCurso) {
     const svC = epCurso.signos_vitales || {};
     const vitalsC = `SpO2 ${svC.spo2 || "—"}% | FC ${svC.fc || "—"} | PA ${svC.pa || "—"} | T° ${svC.temp || "—"}°C`;
+    const cieC = epCurso.cie10 || (STATE?.cie10 || (STATE?.cie10Codigo ? `${STATE.cie10Codigo} — ${STATE.cie10Descripcion || ""}` : "—"));
     filasHtml += `
       <tr style="background:#f0f9ff;">
         <td style="font-weight:800;color:#0369a1;">EN CURSO<br><code style="font-size:10px;">${epCurso.folio || hc}</code></td>
         <td>${epCurso.fecha_hora_texto || "—"}</td>
         <td style="font-weight:800;color:#0284c7;">${epCurso.prioridad || "—"}</td>
         <td>${epCurso.motivo_consulta || "—"}</td>
+        <td>${cieC}</td>
         <td style="font-size:11px;">${vitalsC}</td>
         <td>${epCurso.cama_asignada || "—"}</td>
         <td>—</td>
@@ -2452,19 +2455,21 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
   }
 
   if (episodios.length === 0 && !epCurso) {
-    filasHtml = `<tr><td colspan="7" style="text-align:center;padding:16px;color:#64748b;">— (Sin episodios de emergencia registrados)</td></tr>`;
+    filasHtml = `<tr><td colspan="8" style="text-align:center;padding:16px;color:#64748b;">— (Sin episodios de emergencia registrados)</td></tr>`;
   } else {
     episodios.forEach((ep, i) => {
       const sv = ep.signos_vitales || {};
       const pa = sv.pa || (sv.pas && sv.pad ? `${sv.pas}/${sv.pad}` : "—");
       const vitalsStr = `SpO2 ${sv.spo2 || "—"}% | FC ${sv.fc || "—"} | PA ${pa} | T° ${sv.temp || "—"}°C`;
       const pagoStr = ep.liquidacion?.totalPaciente !== undefined ? `S/. ${ep.liquidacion.totalPaciente.toFixed(2)}` : "S/. 0.00";
+      const cieEp = ep.cie10 || (ep.cie10_codigo ? `${ep.cie10_codigo} — ${ep.cie10_descripcion || ""}` : ep.diagnostico) || "—";
       filasHtml += `
         <tr>
           <td style="font-weight:700;">#${episodios.length - i}<br><code style="font-size:10px;">${ep.folio || ""}</code></td>
           <td>${ep.fecha || "—"}<br><span style="font-size:10px;color:#64748b;">${ep.hora || ""}</span></td>
           <td style="font-weight:800;color:#0284c7;">${ep.prioridad || "—"}</td>
           <td>${ep.motivo_consulta || "—"}</td>
+          <td>${cieEp}</td>
           <td style="font-size:11px;">${vitalsStr}</td>
           <td>${ep.cama_asignada || ep.destino_clinico || "—"}</td>
           <td style="font-weight:800;">${pagoStr}<br><span style="font-size:10px;color:#16a34a;">${ep.tipo_seguro || seguro}</span></td>
@@ -2587,7 +2592,7 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
       <div class="section-box">
         <div class="section-title">VI. Registro Histórico de Ingresos y Atenciones de Emergencia (${episodios.length})</div>
         <table>
-          <thead><tr><th>Episodio</th><th>Fecha / Hora</th><th>Prioridad</th><th>Motivo</th><th>Signos Vitales</th><th>Cama / Destino</th><th>Liquidación</th></tr></thead>
+          <thead><tr><th>Episodio</th><th>Fecha / Hora</th><th>Prioridad</th><th>Motivo</th><th>Diagnóstico CIE-10</th><th>Signos Vitales</th><th>Cama / Destino</th><th>Liquidación</th></tr></thead>
           <tbody>${filasHtml}</tbody>
         </table>
       </div>
@@ -10276,6 +10281,7 @@ function construirHTMLDocumentoLiquidacion() {
       <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:6px;">
         <strong>Nombre del Paciente:</strong> ${nombreMostrar} | <strong>Identificador:</strong> ${STATE.identificador || "—"} | <strong>HC:</strong> ${STATE.historiaClinica || "—"}<br>
         <strong>Seguro:</strong> ${seguroMostrar} | <strong>Régimen Prestacional:</strong> ${liq.etiquetaRegimen}<br>
+        <strong>Diagnóstico CIE-10:</strong> ${STATE.cie10 || (STATE.cie10Codigo ? `${STATE.cie10Codigo} — ${STATE.cie10Descripcion || ""}` : "En evaluación clínica")}<br>
         <strong>Fecha de Liquidación:</strong> ${fecha} | <strong>Lugar de Prestación:</strong> ${liq.lugarAtencion}
       </div>
       <table>
@@ -11194,7 +11200,7 @@ function limpiarFormularioCompletoState() {
     "cie10_select", "cie10_input", "enfermero_triaje_select", "medico_responsable_select",
     "select_ipress_publica", "select_plan_privado", "sel_consentimiento_medico",
     "sel_condicion_consentimiento", "sel_procedimiento_consentimiento",
-    "select_grupo_sanguineo", "select_factor_rh"
+    "select_grupo_sanguineo", "select_factor_rh", "select_grupo_sanguineo_mod1", "select_factor_rh_mod1"
   ];
   inputsIds.forEach(id => {
     const el = document.getElementById(id);
@@ -12794,6 +12800,11 @@ function sincronizarGsYRhEnModulos(gsVal, rhVal) {
   if (elGs4) elGs4.value = gs;
   const elRh4 = document.getElementById("select_factor_rh");
   if (elRh4) elRh4.value = rh;
+
+  const elGs1 = document.getElementById("select_grupo_sanguineo_mod1");
+  if (elGs1) elGs1.value = gs;
+  const elRh1 = document.getElementById("select_factor_rh_mod1");
+  if (elRh1) elRh1.value = rh;
 
   const elGs2 = document.getElementById("gsan_full");
   if (elGs2) {
@@ -16788,6 +16799,26 @@ function actualizarGrupoYFactorRh() {
   }
 }
 window.actualizarGrupoYFactorRh = actualizarGrupoYFactorRh;
+
+function actualizarGsRhDesdeMod1() {
+  const gs = document.getElementById("select_grupo_sanguineo_mod1")?.value || "";
+  const rh = document.getElementById("select_factor_rh_mod1")?.value || "";
+  sincronizarGsYRhEnModulos(gs, rh);
+  if (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA) && typeof pacienteActivoId !== "undefined") {
+    const pxActivo = PACIENTES_COLA.find(x => x.id === pacienteActivoId);
+    if (pxActivo && pxActivo.stateSnapshot) {
+      pxActivo.stateSnapshot.grupoSanguineo = gs;
+      pxActivo.stateSnapshot.factorRh = rh;
+    }
+  }
+  if (typeof guardarEnHistoriaClinicaMaster === "function") {
+    guardarEnHistoriaClinicaMaster({ grupo_sanguineo: gs || "—", factor_rh: rh || "—" });
+  }
+  if (typeof registrarLogAuditoria === "function" && (gs || rh)) {
+    registrarLogAuditoria("Módulo 1", "TRIAJE_GS_RH_REFERENCIAL", `Grupo Sanguíneo: ${gs || "—"} | Factor Rh: ${rh || "—"}`);
+  }
+}
+window.actualizarGsRhDesdeMod1 = actualizarGsRhDesdeMod1;
 
 function toggleConsentimientoFirmado(checked) {
   STATE.consentimientoAdjuntoHC = Boolean(checked);

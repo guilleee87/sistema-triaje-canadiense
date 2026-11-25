@@ -2748,6 +2748,9 @@
         <span class="toggle-arrow" id="arrow_mod1">▼</span>
       </div>
       <div class="module-section-body" id="body_mod1" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>NTS N° 042-MINSA/DGSP-V.01 &amp; Ley N° 27604</strong> — Todo paciente que ingresa a Emergencia recibe evaluación clínica inmediata sin exigir pago, DNI ni seguro previo.
+        </div>
 
         
                 <!-- REGISTRO DEL LICENCIADO(A) EN ENFERMERÍA DE TRIAJE (CEP) - NTS N° 042-MINSA -->
@@ -3301,6 +3304,36 @@
           <div id="alergias_mod1_banner" style="display:none; margin-top:6px; padding:6px 12px; border-radius:6px; background:#fff1f2; border:1px solid #fecdd3; color:#9f1239; font-size:0.78rem; font-weight:700;"></div>
         </div>
 
+        <!-- TIPO DE SANGRE Y FACTOR RH EN MÓDULO 1 (OPCIONAL, NO LIMITANTE, EDITABLE EN MÓDULO 4) -->
+        <div id="card_gs_rh_mod1" class="form-field" style="margin: 10px 0 12px; background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; padding:12px 14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+            <span style="font-weight:800; font-size:0.82rem; color:#9f1239;">🩸 Tipo de Sangre (GS) y Factor Rh (Referencial en Triaje):</span>
+            <span style="font-size:0.72rem; font-weight:700; color:#881337; background:#ffffff; border:1px solid #fda4af; border-radius:6px; padding:2px 8px;">Opcional · No bloquea el flujo · Editable en Módulo 4</span>
+          </div>
+          <div class="form-grid-2" style="margin-bottom:0;">
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="select_grupo_sanguineo_mod1" style="font-size:0.76rem; font-weight:700; color:#881337;">Tipo de Sangre / Grupo Sanguíneo:</label>
+              <select id="select_grupo_sanguineo_mod1" class="input-full" onchange="actualizarGsRhDesdeMod1()" style="font-weight:700;">
+                <option value="">Por tipificar / Desconocido</option>
+                <option value="No se acuerda">No se acuerda</option>
+                <option value="O">Grupo O</option>
+                <option value="A">Grupo A</option>
+                <option value="B">Grupo B</option>
+                <option value="AB">Grupo AB</option>
+              </select>
+            </div>
+            <div class="form-field" style="margin-bottom:0;">
+              <label for="select_factor_rh_mod1" style="font-size:0.76rem; font-weight:700; color:#881337;">Factor Rh:</label>
+              <select id="select_factor_rh_mod1" class="input-full" onchange="actualizarGsRhDesdeMod1()" style="font-weight:700;">
+                <option value="">Por tipificar / Desconocido</option>
+                <option value="No se acuerda">No se acuerda</option>
+                <option value="Positivo (Rh+)">Positivo (Rh+)</option>
+                <option value="Negativo (Rh-)">Negativo (Rh-)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
         <!-- 8. BOTÓN DE EVALUACIÓN Y RESULTADO DE TRIAJE -->
         <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
           <button type="button" class="btn-full-primary" style="flex:1; padding:12px; font-size:0.92rem;" onclick="evaluarPacienteCompleto()">
@@ -3376,6 +3409,9 @@
         <span class="toggle-arrow" id="arrow_mod2">▼</span>
       </div>
       <div class="module-section-body" id="body_mod2" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>Ley N° 29414 &amp; NTS N° 139-MINSA</strong> — La filiación y apertura de Historia Clínica única no retrasan la atención en Prioridad I/II; en pacientes NN se asigna código temporal.
+        </div>
 
         <div class="norma-pill-banner" style="background:#eff6ff; border-color:#93c5fd; color:#1e40af;">
           <span class="norma-tag" style="background:#1d4ed8;">Ley N° 27604 Art. 3°</span>
@@ -3536,6 +3572,9 @@
         <span class="toggle-arrow" id="arrow_mod3">▼</span>
       </div>
       <div class="module-section-body" id="body_mod3" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>Ley N° 29344 (AUS) &amp; D.S. N° 024-2002-MTC (SOAT)</strong> — La acreditación de seguro (SIS, EsSalud, EPS, SOAT o Particular) corre en paralelo en emergencia vital; la liquidación es post-estabilización.
+        </div>
 
         <!-- RAMA A: PESTAÑA EXCLUSIVA SOAT (ACCIDENTE DE TRÁNSITO) -->
         <div id="seccion_soat_wrapper" style="display:none; margin-bottom:20px;">
@@ -3745,6 +3784,9 @@
         <span class="toggle-arrow" id="arrow_mod4">▼</span>
       </div>
       <div class="module-section-body" id="body_mod4" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>Ley N° 26842 (Arts. 4° y 15°) &amp; D.S. N° 027-2015-SA</strong> — El diagnóstico CIE-10 sustenta la terapéutica y cobertura; el consentimiento escrito solo es obligatorio en cirugía o procedimientos invasivos.
+        </div>
 
         <div class="norma-pill-banner">
           <span class="norma-tag">NTS N° 139-MINSA</span>
@@ -4463,6 +4505,9 @@
         <span class="toggle-arrow" id="arrow_mod5">▼</span>
       </div>
       <div class="module-section-body" id="body_mod5" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>NTS N° 042-MINSA/DGSP-V.01</strong> — La estancia reglamentaria en Sala de Observación es de 12 a 24 horas como máximo antes de definir alta, hospitalización o referencia.
+        </div>
 
         <div class="norma-pill-banner">
           <span class="norma-tag">NTS N° 042-MINSA</span>
@@ -4637,6 +4682,9 @@
         <span class="toggle-arrow" id="arrow_mod6">▼</span>
       </div>
       <div class="module-section-body" id="body_mod6" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>NTS N° 031-MINSA (UCI) &amp; Ley N° 27604</strong> — La asignación de camas críticas (Shock Trauma, UCI, SOP) prioriza el riesgo vital y la disponibilidad en tiempo real.
+        </div>
 
         <div class="norma-pill-banner">
           <span class="norma-tag">NTS N° 031-MINSA</span>
@@ -4863,6 +4911,9 @@
         <span class="toggle-arrow" id="arrow_mod7">▼</span>
       </div>
       <div class="module-section-body" id="body_mod7" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>NTS N° 139-MINSA &amp; D.S. N° 016-2002-SA</strong> — Todo egreso requiere diagnóstico CIE-10 definitivo/presuntivo, indicaciones al alta, firma facultativa y destino clínico.
+        </div>
 
         <div class="norma-pill-banner">
           <span class="norma-tag">Código Procesal Penal Art. 195°</span>
@@ -5200,6 +5251,9 @@
         <span class="toggle-arrow" id="arrow_mod8">▼</span>
       </div>
       <div class="module-section-body" id="body_mod8" style="display: none;">
+        <div class="nota-legal-modulo" style="font-size:0.71rem; color:#475569; background:#f8fafc; border-left:3px solid #0284c7; padding:5px 10px; border-radius:4px; margin-bottom:10px;">
+          ⚖️ <strong>Base Legal:</strong> <strong>Ley N° 27604, Ley N° 29414 &amp; TEDEF-SUSALUD</strong> — Liquidación transparente post-estabilización; en emergencia vital (P-I/P-II) la cobertura estatal/SOAT evita cobro indebido al paciente.
+        </div>
 
         <!-- ALERTA LEGAL OFICIAL LEY 27604 Y D.S. 016-2002-SA -->
         <div class="norma-pill-banner" style="background:#f0fdf4; border-color:#86efac; color:#166534; padding:16px;">
