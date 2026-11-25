@@ -6283,12 +6283,33 @@ function calcularLiquidacionSeguro() {
     };
   }
 
-  // 4. PACIENTE SIN SEGURO (PARTICULAR) — APLICA TANTO EN PÚBLICO COMO EN CLÍNICA PRIVADA
+  // 4. PACIENTE NO ASEGURADO (PARTICULAR) — DIFERENCIA ENTRE EMERGENCIA VITAL (LEY N° 27604) Y URGENCIA (CTAS III-V)
   if (esParticularSinSeguro) {
+    const nombreEst = entorno === "privado" ? "Clínica Privada" : (entorno === "essalud" ? "Hospital EsSalud" : "Hospital MINSA");
+    if (esEmergencia) {
+      return {
+        regimen: "PARTICULAR_LEY_27604",
+        entorno: entorno === "privado" ? "PRIVADO_LEY27604" : (entorno === "essalud" ? "PUBLICO_ESSI" : "PUBLICO_FUA"),
+        etiquetaRegimen: `No Asegurado en ${nombreEst} · Emergencia Vital CTAS ${ctasNivel} (Ley N° 27604)`,
+        copagoFijo: 0,
+        coaseguroPct: 0,
+        totalBruto: totalBruto,
+        coberturaSeguro: totalBruto,
+        totalPaciente: 0,
+        lineasContables: [
+          { concepto: "1. Total Bruto Acumulado", monto: totalBruto },
+          { concepto: "2. Garantía de Atención Inmediata Sin Pago Previo (Ley N° 27604)", monto: -totalBruto },
+          { concepto: "3. Exoneración de Cobro en Sala de Estabilización", monto: 0 },
+          { concepto: "4. Saldo Exigible Antes de Estabilización (Post-estabilización: Liquidación)", monto: 0 }
+        ],
+        motivoLiquidacion: `Paciente no asegurado en ${nombreEst} con Emergencia Vital (CTAS ${ctasNivel}). Ley N° 27604 prohíbe exigir pago previo o garantía; la cuenta se regulariza o afilia de oficio post-estabilización.`,
+        cartaGarantiaRequerida: false
+      };
+    }
     return {
       regimen: "PARTICULAR",
       entorno: "PARTICULAR",
-      etiquetaRegimen: `Particular · Sin Cobertura de Seguro (${entorno === "privado" ? "Tarifa Clínica Privada" : "Tarifa Pública Sin Seguro"})`,
+      etiquetaRegimen: `No Asegurado (Particular) en ${nombreEst} · Urgencia CTAS ${ctasNivel} (Pago 100%)`,
       copagoFijo: 0,
       coaseguroPct: 1.0,
       totalBruto: totalBruto,
@@ -6300,13 +6321,13 @@ function calcularLiquidacionSeguro() {
         { concepto: "3. Coaseguro a cargo del Paciente (100%)", monto: 0 },
         { concepto: "4. Saldo Total a Pagar en Caja", monto: totalBruto }
       ],
-      motivoLiquidacion: "Paciente sin seguro médico activo (Particular). Asume el 100% del tarifario asistencial.",
+      motivoLiquidacion: `Paciente no asegurado atendido por urgencia no vital (CTAS ${ctasNivel}) en ${nombreEst}. Asume el 100% del tarifario institucional.`,
       cartaGarantiaRequerida: false
     };
   }
 
-  // 5. MODO PRIVADO GRANULAR (EPS / ASEGURADORAS PRIVADAS Y CONVENIOS)
-  if (entorno === "privado" || STATE.esClinicaPrivada || tipoSegStr.toLowerCase().includes("eps") || tipoSegStr.toLowerCase().includes("privad")) {
+  // 5. ESTABLECIMIENTO CLÍNICA PRIVADA (EPS / SITEDS Y CRUZADOS SIS-ESSALUD EN PRIVADO)
+  if (entorno === "privado" || STATE.esClinicaPrivada) {
     const esSoloPublicoEnPrivado = (tipoSegStr === "SIS" || tipoSegStr === "EsSalud");
     if (esSoloPublicoEnPrivado) {
       if (esEmergencia) {
@@ -6456,48 +6477,242 @@ function calcularLiquidacionSeguro() {
     };
   }
 
-  // 6. MODO PÚBLICO: MINSA / SIS (FUA)
-  if (STATE.tipoSeguro === "SIS" || (!STATE.tipoSeguro && entorno === "publico")) {
-    return {
-      regimen: "PUBLICO_SIS_FUA",
-      entorno: "PUBLICO_FUA",
-      etiquetaRegimen: `MINSA · SIS Gratuito (FUA: ${STATE.nroFua || "FUA-2026-PENDIENTE"})`,
-      copagoFijo: 0,
-      coaseguroPct: 0,
-      totalBruto: totalBruto,
-      coberturaSeguro: totalBruto,
-      totalPaciente: 0,
-      lineasContables: [
-        { concepto: "1. Total Bruto Facturable", monto: totalBruto },
-        { concepto: "2. Cobertura Integral SIS (FUA 100%)", monto: -totalBruto },
-        { concepto: "3. Deducibles / Copagos Públicos", monto: 0 },
-        { concepto: "4. Pago Final del Paciente (Cero Copago)", monto: 0 }
-      ],
-      motivoLiquidacion: "Atención cubierta al 100% por el Seguro Integral de Salud (SIS) mediante subsidio FUA.",
-      cartaGarantiaRequerida: false
-    };
+  // 6. MODO PÚBLICO: HOSPITAL MINSA (entorno === "sis" / "publico")
+  if (entorno === "sis" || entorno === "publico") {
+    if (tipoSegStr === "SIS" || (!tipoSegStr || tipoSegStr === "Por verificar")) {
+      return {
+        regimen: "PUBLICO_SIS_FUA",
+        entorno: "PUBLICO_FUA",
+        etiquetaRegimen: `MINSA · SIS Gratuito (FUA: ${STATE.nroFua || "Pendiente de apertura"})`,
+        copagoFijo: 0,
+        coaseguroPct: 0,
+        totalBruto: totalBruto,
+        coberturaSeguro: totalBruto,
+        totalPaciente: 0,
+        lineasContables: [
+          { concepto: "1. Total Bruto Facturable", monto: totalBruto },
+          { concepto: "2. Cobertura Integral SIS (FUA R.J. N° 081-2014/SIS — 100%)", monto: -totalBruto },
+          { concepto: "3. Deducibles / Copagos Públicos", monto: 0 },
+          { concepto: "4. Pago Final del Paciente (Cero Copago)", monto: 0 }
+        ],
+        motivoLiquidacion: "Atención cubierta al 100% por el Seguro Integral de Salud (SIS) mediante Formato Único de Atención (FUA).",
+        cartaGarantiaRequerida: false
+      };
+    }
+    if (tipoSegStr === "EsSalud") {
+      const esquemaA = {
+        titulo: "Escenario A: Asegurado EsSalud atendido en MINSA / GORE (Ley N° 27604 & Intercambio Prestacional)",
+        actores: "IPRESS: Hospital MINSA / GORE · IAFAS: EsSalud (RUC 20131257750) · Usuario: Asegurado regular, agrario, potestativo o con latencia vigente.",
+        condicionTriaje: "Solo aplica cobertura automática si el triaje califica como Emergencia (Prioridad I o II). Si es Prioridad III/IV/V (urgencia menor), el MINSA puede cobrar directamente al paciente.",
+        acreditacionPlazo: "Consulta en SITEDS (SUSALUD) / acreditación web EsSalud. Plazo de aviso: Oficina de Seguros MINSA notifica a la Red Asistencial EsSalud dentro de las 24 horas del ingreso.",
+        estabilizacionReferencia: "Estabilizado el paciente, MINSA solicita traslado a EsSalud. Si EsSalud no tiene cama disponible, debe emitir Carta de Garantía para cubrir hospitalización o UCI en MINSA.",
+        valorizacion: "Con convenio: Tarifario de Intercambio Prestacional (CPMS). Sin convenio: Tarifario institucional MINSA de atención a terceros/IAFAS.",
+        expediente: "Copia HC emergencia/epicrisis, Hoja SITEDS + DNI, Liquidación detallada por rubro, Hoja de conformidad firmada y copia de notificación a EsSalud.",
+        documentoCobro: "Factura Electrónica (Serie F) emitida por la Unidad Ejecutora MINSA a nombre de EsSalud (RUC 20131257750) + oficio de cobranza y expediente.",
+        auditoriaGlosas: "Auditoría Médica EsSalud revisa y puede glosar medicamentos fuera de petitorio, estancias post-estabilización sin Carta de Garantía o cobros sin sustento en HC.",
+        flujoPago: "Transferencia bancaria / pago de factura directa de EsSalud a la cuenta de Recursos Directamente Recaudados (RDR) del hospital/UE MINSA.",
+        excepcionPaciente: "Si pierde acreditación, no era emergencia (P-III/IV/V) o compra insumos por fuera: MINSA emite Boleta de Venta al paciente (reembolso extraordinario ante EsSalud sujeto a rechazo)."
+      };
+      if (esEmergencia) {
+        return {
+          regimen: "INTERCAMBIO_ESSALUD_EN_MINSA",
+          entorno: "PUBLICO_FUA",
+          etiquetaRegimen: `Escenario A · EsSalud en MINSA/GORE — Emergencia CTAS ${ctasNivel} (RUC 20131257750 · Factura Serie F)`,
+          copagoFijo: 0,
+          coaseguroPct: 0,
+          totalBruto: totalBruto,
+          coberturaSeguro: totalBruto,
+          totalPaciente: 0,
+          lineasContables: [
+            { concepto: "1. Total Bruto Valorizado (CPMS / Terceros MINSA)", monto: totalBruto },
+            { concepto: "2. Cobertura Intercambio / Factura Serie F a EsSalud (RUC 20131257750)", monto: -totalBruto },
+            { concepto: "3. Copago del Paciente en Emergencia Vital (Ley N° 27604)", monto: 0 },
+            { concepto: "4. Saldo a Pagar por el Paciente", monto: 0 }
+          ],
+          motivoLiquidacion: `Escenario A (EsSalud en MINSA/GORE): Emergencia Prioridad ${ctasNivel} cubierta por Ley N° 27604. Notificar a EsSalud dentro de 24 h; cobro mediante Factura Electrónica Serie F a EsSalud (RUC 20131257750) hacia cuenta RDR MINSA.`,
+          cartaGarantiaRequerida: true,
+          esquemaIntercambio: esquemaA
+        };
+      }
+      return {
+        regimen: "MINSA_REEMBOLSO_ESSALUD",
+        entorno: "PARTICULAR",
+        etiquetaRegimen: `Escenario A · EsSalud en MINSA/GORE — Urgencia CTAS ${ctasNivel} (Boleta de Venta al Paciente)`,
+        copagoFijo: 0,
+        coaseguroPct: 1.0,
+        totalBruto: totalBruto,
+        coberturaSeguro: 0,
+        totalPaciente: totalBruto,
+        lineasContables: [
+          { concepto: "1. Total Bruto Tarifario MINSA", monto: totalBruto },
+          { concepto: "2. Cobertura Automática Ley N° 27604 (No aplica en Prioridad III–V)", monto: 0 },
+          { concepto: "3. Comprobante: Boleta de Venta al Paciente (Reembolso sujeto a rechazo)", monto: 0 },
+          { concepto: "4. Saldo a Pagar en Caja MINSA (100%)", monto: totalBruto }
+        ],
+        motivoLiquidacion: `Escenario A (Excepción Prioridad ${ctasNivel}): Urgencia menor no cubierta por Ley N° 27604. MINSA emite Boleta de Venta al paciente (reembolso extraordinario ante EsSalud sujeto a rechazo).`,
+        cartaGarantiaRequerida: false,
+        esquemaIntercambio: esquemaA
+      };
+    }
+    if (tipoSegStr.toLowerCase().includes("eps") || tipoSegStr.toLowerCase().includes("privad")) {
+      if (esEmergencia) {
+        return {
+          regimen: "LEY_27604_EPS_EN_MINSA",
+          entorno: "PUBLICO_FUA",
+          etiquetaRegimen: `${tipoSegStr} en Hospital MINSA · Emergencia Vital CTAS ${ctasNivel} (Ley N° 27604)`,
+          copagoFijo: 0,
+          coaseguroPct: 0,
+          totalBruto: totalBruto,
+          coberturaSeguro: totalBruto,
+          totalPaciente: 0,
+          lineasContables: [
+            { concepto: "1. Total Bruto Facturable", monto: totalBruto },
+            { concepto: "2. Estabilización Ley N° 27604 (Recupero a IAFAS EPS)", monto: -totalBruto },
+            { concepto: "3. Copago en Sala de Reanimación", monto: 0 },
+            { concepto: "4. Saldo Inmediato Exigible al Paciente", monto: 0 }
+          ],
+          motivoLiquidacion: `Asegurado ${tipoSegStr} en Hospital MINSA con Emergencia Vital (CTAS ${ctasNivel}). Estabilización garantizada por Ley N° 27604.`,
+          cartaGarantiaRequerida: false
+        };
+      }
+      return {
+        regimen: "MINSA_TARIFA_EPS",
+        entorno: "PARTICULAR",
+        etiquetaRegimen: `${tipoSegStr} en MINSA · Urgencia CTAS ${ctasNivel} (Tarifa Pública / Reembolso EPS)`,
+        copagoFijo: 0,
+        coaseguroPct: 1.0,
+        totalBruto: totalBruto,
+        coberturaSeguro: 0,
+        totalPaciente: totalBruto,
+        lineasContables: [
+          { concepto: "1. Total Bruto Tarifario MINSA", monto: totalBruto },
+          { concepto: "2. Cobertura Directa EPS (IPRESS Pública Sin Convenio)", monto: 0 },
+          { concepto: "3. Comprobante para Reembolso en Póliza EPS", monto: 0 },
+          { concepto: "4. Saldo a Pagar en Caja MINSA", monto: totalBruto }
+        ],
+        motivoLiquidacion: `Asegurado ${tipoSegStr} en MINSA por Urgencia (CTAS ${ctasNivel}). Paga tarifa pública MINSA con boleta para reembolso ante su EPS.`,
+        cartaGarantiaRequerida: false
+      };
+    }
   }
 
-  // 6. MODO PÚBLICO: ESSALUD (ESSI)
-  if (STATE.tipoSeguro === "EsSalud") {
-    return {
-      regimen: "PUBLICO_ESSALUD_ESSI",
-      entorno: "PUBLICO_ESSI",
-      etiquetaRegimen: `EsSalud · Acreditación Regular Activa (ESSI: ${STATE.nroEssi || "ESSI-2026-PENDIENTE"})`,
-      copagoFijo: 0,
-      coaseguroPct: 0,
-      totalBruto: totalBruto,
-      coberturaSeguro: totalBruto,
-      totalPaciente: 0,
-      lineasContables: [
-        { concepto: "1. Total Bruto Liquidado", monto: totalBruto },
-        { concepto: "2. Cobertura Institucional EsSalud", monto: -totalBruto },
-        { concepto: "3. Copago Asistencial Titular", monto: 0 },
-        { concepto: "4. Saldo Final Paciente (Cero Copago)", monto: 0 }
-      ],
-      motivoLiquidacion: "Atención cubierta al 100% por la Seguridad Social EsSalud (Acreditación ESSI).",
-      cartaGarantiaRequerida: false
-    };
+  // 7. MODO PÚBLICO: HOSPITAL ESSALUD (entorno === "essalud")
+  if (entorno === "essalud") {
+    if (tipoSegStr === "EsSalud" || (!tipoSegStr || tipoSegStr === "Por verificar")) {
+      return {
+        regimen: "PUBLICO_ESSALUD_ESSI",
+        entorno: "PUBLICO_ESSI",
+        etiquetaRegimen: `EsSalud · Acreditación Regular Activa (Hoja ESSI: ${STATE.nroEssi || "Pendiente de apertura"})`,
+        copagoFijo: 0,
+        coaseguroPct: 0,
+        totalBruto: totalBruto,
+        coberturaSeguro: totalBruto,
+        totalPaciente: 0,
+        lineasContables: [
+          { concepto: "1. Total Bruto Liquidado", monto: totalBruto },
+          { concepto: "2. Cobertura Institucional EsSalud (Ley N° 26790 — 100%)", monto: -totalBruto },
+          { concepto: "3. Copago Asistencial Titular", monto: 0 },
+          { concepto: "4. Saldo Final Paciente (Cero Copago)", monto: 0 }
+        ],
+        motivoLiquidacion: "Atención cubierta al 100% por la Seguridad Social EsSalud mediante Hoja de Atención de Emergencia ESSI.",
+        cartaGarantiaRequerida: false
+      };
+    }
+    if (tipoSegStr === "SIS") {
+      const esquemaB = {
+        titulo: "Escenario B: Asegurado SIS atendido en EsSalud (Ley N° 27604 & Intercambio Prestacional)",
+        actores: "IPRESS: Hospital / Policlínico EsSalud · IAFAS: Seguro Integral de Salud - SIS (RUC 20505208626) · Usuario: Afiliado SIS (Gratuito, Para Todos, Independiente, Emprendedor, Microempresas).",
+        condicionTriaje: "Aplica cobertura directa por Ley N° 27604 para Emergencia (Prioridad I o II). Si es Prioridad III/IV/V (urgencia menor), EsSalud no está obligado a cubrir gratuitamente salvo convenio específico en la zona.",
+        acreditacionPlazo: "Consulta en SITEDS o consulta en línea del SIS. Plazo de aviso: Oficina de Seguros EsSalud notifica a la UDR del SIS dentro de las 24 a 48 horas posteriores al ingreso.",
+        estabilizacionReferencia: "Estabilizado el paciente, EsSalud coordina traslado a hospital MINSA/GORE. Si no hay cupo, la UDR del SIS emite Autorización de Continuidad / Carta de Garantía.",
+        valorizacion: "Tarifarios del convenio de intercambio prestacional vigente o tarifario SIS (codificación CPMS y precios SISMED para medicamentos/insumos del petitorio PNUME).",
+        expediente: "Copia HC / Informe médico emergencia, Constancia SITEDS + DNI, Formato de Liquidación de Prestaciones (equivalente al FUA de intercambio), Constancia de notificación a UDR SIS y Carta de Garantía.",
+        documentoCobro: "Sin comprobante comercial (No factura / No boleta). Oficio de Solicitud de Reembolso + Resumen de Liquidación de Prestaciones valorizado dirigido a la UDR o Gerencia Macro Regional del SIS.",
+        auditoriaGlosas: "Médicos supervisores de UDR SIS auditan; glosan si el diagnóstico no era Prioridad I/II, notificación fuera de plazo (24–48 h) o insumos fuera de PNUME/SIS.",
+        flujoPago: "El SIS aprueba la liquidación mediante resolución/conformidad y realiza transferencia financiera presupuestal (entre pliegos públicos) a favor de EsSalud.",
+        excepcionPaciente: "Si no tiene SIS activo o ingresa por urgencia menor (Prioridad III/IV/V): EsSalud cobra como paciente particular (Boleta de Venta). El SIS NO reembolsa gastos pagados de bolsillo por sus afiliados."
+      };
+      if (esEmergencia) {
+        return {
+          regimen: "INTERCAMBIO_SIS_EN_ESSALUD",
+          entorno: "PUBLICO_ESSI",
+          etiquetaRegimen: `Escenario B · SIS en EsSalud — Emergencia CTAS ${ctasNivel} (RUC 20505208626 · Sin Factura / Oficio UDR)`,
+          copagoFijo: 0,
+          coaseguroPct: 0,
+          totalBruto: totalBruto,
+          coberturaSeguro: totalBruto,
+          totalPaciente: 0,
+          lineasContables: [
+            { concepto: "1. Total Bruto Valorizado (CPMS / SISMED PNUME)", monto: totalBruto },
+            { concepto: "2. Transferencia Presupuestal SIS vía Oficio UDR (RUC 20505208626)", monto: -totalBruto },
+            { concepto: "3. Copago del Paciente en Emergencia Vital (Ley N° 27604)", monto: 0 },
+            { concepto: "4. Saldo a Pagar por el Paciente", monto: 0 }
+          ],
+          motivoLiquidacion: `Escenario B (SIS en EsSalud): Emergencia Prioridad ${ctasNivel} cubierta por Ley N° 27604. Notificar a UDR SIS en 24–48 h; sin comprobante comercial (Oficio de Reembolso + Liquidación de Prestaciones hacia transferencia entre pliegos).`,
+          cartaGarantiaRequerida: true,
+          esquemaIntercambio: esquemaB
+        };
+      }
+      return {
+        regimen: "ESSALUD_TARIFA_NO_ASEGURADO",
+        entorno: "PARTICULAR",
+        etiquetaRegimen: `Escenario B · SIS en EsSalud — Urgencia CTAS ${ctasNivel} (Boleta Particular · SIS No Reembolsa)`,
+        copagoFijo: 0,
+        coaseguroPct: 1.0,
+        totalBruto: totalBruto,
+        coberturaSeguro: 0,
+        totalPaciente: totalBruto,
+        lineasContables: [
+          { concepto: "1. Total Bruto Tarifario No Asegurado EsSalud", monto: totalBruto },
+          { concepto: "2. Cobertura SIS en EsSalud (No aplica en Prioridad III–V sin convenio)", monto: 0 },
+          { concepto: "3. Comprobante: Boleta de Venta Particular (SIS no reembolsa bolsillo)", monto: 0 },
+          { concepto: "4. Saldo a Pagar en Caja EsSalud (100%)", monto: totalBruto }
+        ],
+        motivoLiquidacion: `Escenario B (Excepción Prioridad ${ctasNivel}): Urgencia menor sin cobertura gratuita en EsSalud. Se cobra como particular con Boleta de Venta; el SIS no reembolsa gastos pagados de bolsillo.`,
+        cartaGarantiaRequerida: false,
+        esquemaIntercambio: esquemaB
+      };
+    }
+    if (tipoSegStr.toLowerCase().includes("eps") || tipoSegStr.toLowerCase().includes("privad")) {
+      if (esEmergencia) {
+        return {
+          regimen: "LEY_27604_EPS_EN_ESSALUD",
+          entorno: "PUBLICO_ESSI",
+          etiquetaRegimen: `${tipoSegStr} en EsSalud · Emergencia Vital CTAS ${ctasNivel} (Ley N° 27604)`,
+          copagoFijo: 0,
+          coaseguroPct: 0,
+          totalBruto: totalBruto,
+          coberturaSeguro: totalBruto,
+          totalPaciente: 0,
+          lineasContables: [
+            { concepto: "1. Total Bruto Liquidado", monto: totalBruto },
+            { concepto: "2. Garantía Ley N° 27604 / Capa Simple EsSalud", monto: -totalBruto },
+            { concepto: "3. Copago en Emergencia Vital", monto: 0 },
+            { concepto: "4. Saldo Final Paciente", monto: 0 }
+          ],
+          motivoLiquidacion: `Asegurado ${tipoSegStr} en Hospital EsSalud con Emergencia Vital (CTAS ${ctasNivel}). Cubierto por Ley N° 27604 y seguridad social.`,
+          cartaGarantiaRequerida: false
+        };
+      }
+      return {
+        regimen: "ESSALUD_CAPA_SIMPLE_EPS",
+        entorno: "PUBLICO_ESSI",
+        etiquetaRegimen: `${tipoSegStr} en EsSalud · Urgencia CTAS ${ctasNivel} (Capa Simple Ley N° 26790)`,
+        copagoFijo: 0,
+        coaseguroPct: 0,
+        totalBruto: totalBruto,
+        coberturaSeguro: totalBruto,
+        totalPaciente: 0,
+        lineasContables: [
+          { concepto: "1. Total Bruto Liquidado", monto: totalBruto },
+          { concepto: "2. Cobertura Capa Compleja / Atención EsSalud (Trabajador EPS Ley N° 26790)", monto: -totalBruto },
+          { concepto: "3. Copago en EsSalud", monto: 0 },
+          { concepto: "4. Saldo a Pagar por el Paciente", monto: 0 }
+        ],
+        motivoLiquidacion: `Trabajador afiliado a ${tipoSegStr} mantiene derecho de atención en EsSalud según Ley N° 26790 (Capa Compleja / Emergencia).`,
+        cartaGarantiaRequerida: false
+      };
+    }
   }
 
   // 7. PARTICULAR (SIN SEGURO)
@@ -6584,6 +6799,21 @@ function actualizarFactura() {
         <div style="font-size:0.75rem; color:#475569; background:#ffffff; border-left:3px solid #0284c7; padding:8px 12px; border-radius:4px; line-height:1.4;">
           <strong>Dictamen Financiero:</strong> ${liq.motivoLiquidacion}
         </div>
+        ${liq.esquemaIntercambio ? `
+          <div style="margin-top:10px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; font-size:0.72rem; line-height:1.45; color:#334155;">
+            <div style="font-weight:800; color:#0f172a; margin-bottom:6px; font-size:0.76rem;">📋 ${liq.esquemaIntercambio.titulo}</div>
+            <div><strong>1. Actores del flujo:</strong> ${liq.esquemaIntercambio.actores}</div>
+            <div><strong>2. Condición de ingreso y Triaje:</strong> ${liq.esquemaIntercambio.condicionTriaje}</div>
+            <div><strong>3. Acreditación y Notificación:</strong> ${liq.esquemaIntercambio.acreditacionPlazo}</div>
+            <div><strong>4. Estabilización y Referencia:</strong> ${liq.esquemaIntercambio.estabilizacionReferencia}</div>
+            <div><strong>5. Valorización y Tarifario:</strong> ${liq.esquemaIntercambio.valorizacion}</div>
+            <div><strong>6. Expediente de sustento:</strong> ${liq.esquemaIntercambio.expediente}</div>
+            <div><strong>7. Documento oficial de cobro:</strong> ${liq.esquemaIntercambio.documentoCobro}</div>
+            <div><strong>8. Auditoría y Glosas:</strong> ${liq.esquemaIntercambio.auditoriaGlosas}</div>
+            <div><strong>9. Flujo financiero de pago:</strong> ${liq.esquemaIntercambio.flujoPago}</div>
+            <div><strong>10. Excepción (Pago del paciente):</strong> ${liq.esquemaIntercambio.excepcionPaciente}</div>
+          </div>
+        ` : ''}
       </div>`;
     detalleEl.innerHTML = tablaHtml;
   }
@@ -8850,32 +9080,23 @@ function activarIngresoDirectoQuirofano() {
 }
 
 function asignarQuirofanoEspecifico(num) {
+  const idSop = `SOP-0${num}`;
+  if (typeof asignarPacienteActualARecurso === "function" && RECURSOS_HOSPITALARIOS[idSop]) {
+    asignarPacienteActualARecurso(idSop);
+    return;
+  }
   const nombreSop = `Quirófano ${num} (SOP ${num} - Emergencia)`;
   STATE.camaAsignada = nombreSop;
-
-  const badge = document.getElementById(`badge_sop${num}`);
-  if (badge) {
-    badge.textContent = "🔴 EN OPERACIÓN";
-    badge.style.background = "#fee2e2";
-    badge.style.color = "#991b1b";
-  }
-
-  registrarFacturaItem(`Derecho de Sala de Operaciones (SOP ${num})`, 400, "Procedimientos");
-  alert(`🏥 Paciente ingresado a ${nombreSop}. Procedimiento quirúrgico activo.`);
   actualizarFactura();
 }
 
 function asignarCamaURPA() {
-  STATE.camaAsignada = "Cama 1 — Sala URPA (Recuperación Post-Anestésica)";
-  const badge = document.getElementById("badge_urpa");
-  if (badge) {
-    badge.textContent = "🟡 1 Cama Ocupada";
-    badge.style.background = "#fef9c3";
-    badge.style.color = "#854d0e";
+  const idLibre = ["URPA-01", "URPA-02"].find(id => RECURSOS_HOSPITALARIOS[id] && RECURSOS_HOSPITALARIOS[id].estado !== "ocupada");
+  if (!idLibre) {
+    alert("⛔ Todas las camas de Sala URPA (URPA-01 y URPA-02) se encuentran ocupadas. Libere una cama antes de asignar.");
+    return;
   }
-  registrarFacturaItem("Estancia en Sala de Recuperación Post-Anestésica (URPA)", 120, "Clínica");
-  alert("🛌 Paciente trasladado exitosamente a Sala URPA para monitoreo post-quirúrgico.");
-  actualizarFactura();
+  asignarPacienteActualARecurso(idLibre);
 }
 
 function ejecutarOrdenQuirurgicaEmergencia() {
@@ -8886,8 +9107,13 @@ function ejecutarOrdenQuirurgicaEmergencia() {
   const nombreCirugia = parts[0];
   const costo = parseFloat(parts[1]) || 650;
   const sala = selSop?.value || "Quirófano 1 (SOP 1 - Trauma Shock)";
+  const sopId = sala.includes("2") ? "SOP-02" : "SOP-01";
 
-  STATE.camaAsignada = sala;
+  if (RECURSOS_HOSPITALARIOS[sopId] && RECURSOS_HOSPITALARIOS[sopId].estado !== "ocupada") {
+    asignarPacienteActualARecurso(sopId, null, nombreCirugia, true);
+  } else {
+    STATE.camaAsignada = sala;
+  }
   registrarFacturaItem(`Intervención Quirúrgica: ${nombreCirugia}`, costo, "Procedimientos");
   registrarFacturaItem("Monitoreo Anestésico y Sedación de Urgencia", 280, "Procedimientos");
 
@@ -8896,7 +9122,7 @@ function ejecutarOrdenQuirurgicaEmergencia() {
     disp.innerHTML = `<span style="color:#15803d;font-weight:700;">✅ Cirugía programada en ${sala}: ${nombreCirugia} (S/. ${costo.toFixed(2)}). Procedimiento cargado formalmente.</span>`;
   }
 
-  alert(`🔪 Orden Quirúrgica Emitida:\n${nombreCirugia}\nAsignado a: ${sala}\nCirujano: ${STATE.medicoTratante}`);
+  alert(`🔪 Orden Quirúrgica Emitida:\n${nombreCirugia}\nAsignado a: ${sala}\nCirujano: ${STATE.medicoTratante || "Médico de Guardia"}`);
   actualizarFactura();
 }
 
@@ -9578,6 +9804,37 @@ function renderizarTableroCamasYQuirofanos(filtro = null, targetContainerId = "c
   }
 
   container.innerHTML = html;
+  sincronizarBadgesRecursosModulo6();
+}
+
+function sincronizarBadgesRecursosModulo6() {
+  const keys = Object.keys(RECURSOS_HOSPITALARIOS);
+  const total = keys.length;
+  const disponibles = keys.filter(k => RECURSOS_HOSPITALARIOS[k].estado !== "ocupada").length;
+  const badgeRes = document.getElementById("badge_resumen_recursos_total");
+  if (badgeRes) {
+    badgeRes.textContent = `${disponibles > 0 ? "🟢" : "🔴"} ${disponibles} de ${total} Disponibles`;
+    badgeRes.style.background = disponibles > 0 ? "#dcfce7" : "#fee2e2";
+    badgeRes.style.color = disponibles > 0 ? "#15803d" : "#991b1b";
+    badgeRes.style.borderColor = disponibles > 0 ? "#86efac" : "#fca5a5";
+  }
+  [1, 2].forEach(n => {
+    const recSop = RECURSOS_HOSPITALARIOS[`SOP-0${n}`];
+    const b = document.getElementById(`badge_sop${n}`);
+    if (b && recSop) {
+      const oc = recSop.estado === "ocupada";
+      b.textContent = oc ? "🔴 EN OPERACIÓN" : "🟢 Disponible";
+      b.style.background = oc ? "#fee2e2" : "#dcfce7";
+      b.style.color = oc ? "#991b1b" : "#15803d";
+    }
+  });
+  const urpaLibres = ["URPA-01", "URPA-02"].filter(id => RECURSOS_HOSPITALARIOS[id] && RECURSOS_HOSPITALARIOS[id].estado !== "ocupada").length;
+  const bUrpa = document.getElementById("badge_urpa");
+  if (bUrpa) {
+    bUrpa.textContent = urpaLibres === 2 ? "🟢 2 Camas Libres" : (urpaLibres === 1 ? "🟡 1 Cama Libre" : "🔴 Ocupada (0 Libres)");
+    bUrpa.style.background = urpaLibres === 2 ? "#dcfce7" : (urpaLibres === 1 ? "#fef9c3" : "#fee2e2");
+    bUrpa.style.color = urpaLibres === 2 ? "#15803d" : (urpaLibres === 1 ? "#854d0e" : "#991b1b");
+  }
 }
 
 // FILTRADO DEL TABLERO
@@ -9608,6 +9865,27 @@ function asignarPacienteActualARecurso(idRecurso, duracionManual = null, motivoM
     return;
   }
 
+  // Validación normativa UCI (NTS N° 031-MINSA): Prioridad 4 UCI bloqueada
+  const prioUci = document.getElementById("prioridad_uci_sel")?.value || "1";
+  if (rec.tipo === "uci" && prioUci === "4") {
+    alert("⛔ Asignación UCI bloqueada (NTS N° 031-MINSA): El paciente tiene Prioridad 4 UCI (bajo riesgo o muerte encefálica irreversible).");
+    return;
+  }
+
+  // Si el paciente activo ya ocupaba otra cama, liberarla automáticamente para evitar doble ocupación
+  if (STATE.camaAsignadaId && STATE.camaAsignadaId !== idRecurso && RECURSOS_HOSPITALARIOS[STATE.camaAsignadaId]) {
+    const prev = RECURSOS_HOSPITALARIOS[STATE.camaAsignadaId];
+    if (prev.estado === "ocupada") {
+      prev.estado = "disponible";
+      prev.paciente = null;
+      prev.inicioMs = null;
+      prev.finMs = null;
+      prev.horasAmpliadas = 0;
+      prev.tiempoFormateado = "--:--:--";
+      prev.progresoPct = 0;
+    }
+  }
+
   const horas = parseFloat(duracionManual) || rec.duracionHoras || 6;
   const motivo = motivoManual || STATE.cie10Descripcion || rec.motivo;
 
@@ -9619,7 +9897,7 @@ function asignarPacienteActualARecurso(idRecurso, duracionManual = null, motivoM
   rec.motivo = motivo;
 
   rec.paciente = {
-    nombre: STATE.identificador || "Paciente en Atención",
+    nombre: STATE.nombreReniec || STATE.identificador || "Paciente en Atención",
     dni: STATE.numDni || "—",
     prioridad: STATE.prioridad || "III",
     diagnostico: motivo,
@@ -9628,6 +9906,20 @@ function asignarPacienteActualARecurso(idRecurso, duracionManual = null, motivoM
 
   STATE.camaAsignada = rec.nombre;
   STATE.camaAsignadaId = rec.id;
+
+  // Sincronizar con la cola compartida de pacientes activos
+  if (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA) && typeof pacienteActivoId !== "undefined") {
+    const pxActivo = PACIENTES_COLA.find(x => x.id === pacienteActivoId);
+    if (pxActivo) {
+      pxActivo.cama = rec.nombre;
+      pxActivo.camaId = rec.id;
+      if (pxActivo.stateSnapshot) {
+        pxActivo.stateSnapshot.camaAsignada = rec.nombre;
+        pxActivo.stateSnapshot.camaAsignadaId = rec.id;
+      }
+      if (typeof renderizarTableroColaPacientes === "function") renderizarTableroColaPacientes();
+    }
+  }
 
   // Facturar estancia/derecho de sala
   if (rec.tipo === "quirofano") {
@@ -9640,7 +9932,8 @@ function asignarPacienteActualARecurso(idRecurso, duracionManual = null, motivoM
     registrarFacturaItem(`Cama de Observación (${rec.id})`, 150, "Hospitalización");
   }
 
-  // Sincronizar badges y displays
+  // Sincronizar badges, cronómetro, cockpit y HC
+  if (typeof tickCronometrosCamas === "function") tickCronometrosCamas();
   renderizarTableroCamasYQuirofanos();
   if (document.getElementById("modalTableroCamasOverlay")?.classList.contains("open")) {
     renderizarTableroCamasYQuirofanos(filtroRecursoActivo, "modal_camas_stock_grid");
@@ -9649,6 +9942,15 @@ function asignarPacienteActualARecurso(idRecurso, duracionManual = null, motivoM
   actualizarFactura();
   if (typeof actualizarWidgetFlotanteCamas === "function") {
     actualizarWidgetFlotanteCamas();
+  }
+  if (window.COCKPIT && typeof window.COCKPIT.actualizarContextoCockpit === "function") {
+    window.COCKPIT.actualizarContextoCockpit();
+  }
+  if (typeof registrarLogAuditoria === "function") {
+    registrarLogAuditoria("Módulo 6", "ASIGNACION_CAMA", `Recurso asignado: ${rec.id} (${rec.nombre}) | Estancia: ${horas}h`);
+  }
+  if (typeof autoGuardarCambioEnHistoriaClinica === "function") {
+    autoGuardarCambioEnHistoriaClinica(`Asignación de cama/recurso: ${rec.nombre}`);
   }
 
   if (!silencioso) alert(`✅ ASIGNACIÓN CONFIRMADA:\n\n${rec.nombre}\nPaciente: ${rec.paciente.nombre}\nEstancia programada: ${horas} horas (${rec.norma})\n\nEl contador en tiempo real ha iniciado.`);
@@ -10957,36 +11259,15 @@ function crearRegistroPaciente(datos = {}) {
   const num = datos.numero || contadorSecuencialPx++;
   const id = datos.id || generarIdPaciente();
 
-  // Asignación variada entre los regímenes peruanos reales: SIS, EsSalud, EPS Privadas y Particular (Sin Seguro)
+  // Sin invención de datos: el seguro y los documentos asistenciales quedan pendientes hasta su verificación real en el flujo
   let tipoSeguroFinal = datos.tipoSeguro;
   let entornoFinal = datos.entornoOperativo;
   let planPrivadoFinal = datos.planPrivado || "base_80_20";
   let planNivelEpsFinal = datos.planNivelEps || "Base";
 
   if (!tipoSeguroFinal) {
-    const slot = (num - 1) % 4;
-    if (slot === 0) {
-      tipoSeguroFinal = "SIS";
-      entornoFinal = "publico";
-    } else if (slot === 1) {
-      tipoSeguroFinal = "EsSalud";
-      entornoFinal = "publico";
-    } else if (slot === 2) {
-      const aseguradorasEps = ["Pacífico EPS", "Rímac EPS", "Mapfre EPS", "La Positiva EPS", "Sanitas EPS"];
-      const planes = [
-        { codigo: "base_80_20", nivel: "Base" },
-        { codigo: "integral_90_10", nivel: "Intermedio" },
-        { codigo: "vip_100", nivel: "VIP" }
-      ];
-      tipoSeguroFinal = aseguradorasEps[num % aseguradorasEps.length];
-      const planSel = planes[num % planes.length];
-      planPrivadoFinal = planSel.codigo;
-      planNivelEpsFinal = planSel.nivel;
-      entornoFinal = "privado";
-    } else {
-      tipoSeguroFinal = "Particular";
-      entornoFinal = (num % 2 === 0) ? "privado" : "publico";
-    }
+    tipoSeguroFinal = "Por verificar";
+    entornoFinal = entornoFinal || "publico";
   } else {
     if (!entornoFinal) {
       const low = String(tipoSeguroFinal).toLowerCase();
@@ -10994,9 +11275,9 @@ function crearRegistroPaciente(datos = {}) {
     }
   }
 
-  const tipoIpressFinal = datos.tipoIpressPublica || (tipoSeguroFinal === "EsSalud" ? "ESSALUD" : (tipoSeguroFinal === "Particular" ? "PARTICULAR" : "MINSA"));
-  const nroFuaFinal = datos.nroFua || (tipoSeguroFinal === "SIS" ? `FUA-2026-${Math.floor(100000 + Math.random() * 900000)}` : "");
-  const nroEssiFinal = datos.nroEssi || (tipoSeguroFinal === "EsSalud" ? `ESSI-2026-${Math.floor(100000 + Math.random() * 900000)}` : "");
+  const tipoIpressFinal = datos.tipoIpressPublica || (tipoSeguroFinal === "EsSalud" ? "ESSALUD" : (tipoSeguroFinal === "Particular" ? "PARTICULAR" : (tipoSeguroFinal === "SIS" ? "MINSA" : "")));
+  const nroFuaFinal = datos.nroFua || "";
+  const nroEssiFinal = datos.nroEssi || "";
 
   return {
     id: id,
@@ -11178,7 +11459,10 @@ function limpiarFormularioCompletoState() {
     renderizarTablaKardexEnfermeria();
   }
   if (typeof STATE !== "undefined" && STATE) {
-    STATE.tipoSeguro = "SIS";
+    STATE.tipoSeguro = "Por verificar";
+    STATE.nroFua = "";
+    STATE.numerFua = "";
+    STATE.nroEssi = "";
     STATE.esAccidenteTransito = false;
     STATE.tipoOrigenEvento = "comun";
     STATE.soatVehiculoFuga = false;
@@ -11766,14 +12050,22 @@ function sincronizarUIFinanciamientoPaciente(px) {
   const selPlanPriv = document.getElementById("select_plan_privado");
   if (selPlanPriv && STATE.planPrivado) selPlanPriv.value = STATE.planPrivado;
 
-  const boxIpress = document.getElementById("subselector_ipress_publica");
+  const boxSis = document.getElementById("subselector_ipress_sis");
+  const boxEss = document.getElementById("subselector_ipress_essalud");
   const boxPlanPriv = document.getElementById("subselector_plan_privado");
-  if (STATE.entornoOperativo === "privado") {
-    if (boxIpress) boxIpress.style.display = "none";
-    if (boxPlanPriv) boxPlanPriv.style.display = "flex";
-  } else {
-    if (boxIpress) boxIpress.style.display = "flex";
-    if (boxPlanPriv) boxPlanPriv.style.display = "none";
+  const modoNorm = (STATE.entornoOperativo === "privado") ? "privado" : ((STATE.entornoOperativo === "essalud" || STATE.tipoIpressPublica === "ESSALUD") ? "essalud" : "sis");
+  if (boxSis) boxSis.style.display = (modoNorm === "sis") ? "flex" : "none";
+  if (boxEss) boxEss.style.display = (modoNorm === "essalud") ? "flex" : "none";
+  if (boxPlanPriv) boxPlanPriv.style.display = (modoNorm === "privado") ? "flex" : "none";
+  const selCondSis = document.getElementById("select_condicion_sis");
+  if (selCondSis && modoNorm === "sis" && STATE.tipoSeguro && STATE.tipoSeguro !== "Por verificar") {
+    const m = Array.from(selCondSis.options).find(o => o.value === STATE.tipoSeguro);
+    if (m) selCondSis.value = STATE.tipoSeguro;
+  }
+  const selCondEss = document.getElementById("select_condicion_essalud");
+  if (selCondEss && modoNorm === "essalud" && STATE.tipoSeguro && STATE.tipoSeguro !== "Por verificar") {
+    const m = Array.from(selCondEss.options).find(o => o.value === STATE.tipoSeguro);
+    if (m) selCondEss.value = STATE.tipoSeguro;
   }
   if (typeof actualizarVisibilidadBotonesEntorno === "function") actualizarVisibilidadBotonesEntorno();
   if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
@@ -11989,7 +12281,17 @@ function abrirModalDetalleYTrazabilidad(id) {
   const dni = (esActivo && STATE.numDni) ? STATE.numDni : (px.dni || "Por registrar");
   const edad = (snap.edad !== null && snap.edad !== undefined) ? `${snap.edad} años` : (px.edad ? `${px.edad} años` : "Por registrar");
   const sexo = (snap.sexo === "F") ? "Femenino" : (snap.sexo === "M") ? "Masculino" : (px.sexo || "Desconocido");
-  const seguro = snap.tipoSeguro || px.tipoSeguro || "SIS";
+  const seguro = snap.tipoSeguro || px.tipoSeguro || "Por verificar";
+  const seguroValidado = Boolean(snap.coberturaValidada || px.coberturaValidada || (seguro && seguro !== "Por verificar"));
+  const docAsistencial = (seguro === "EsSalud" || snap.tipoIpressPublica === "ESSALUD")
+    ? (snap.nroEssi || px.nroEssi || (esActivo ? STATE.nroEssi : "") || "Pendiente de validación")
+    : ((seguro === "SIS" || snap.tipoIpressPublica === "MINSA")
+      ? (snap.nroFua || px.nroFua || (esActivo ? STATE.nroFua : "") || "Pendiente de validación")
+      : "Pendiente de validación");
+  const itemsFactura = Array.isArray(snap.items_factura)
+    ? snap.items_factura
+    : (esActivo && Array.isArray(STATE.items_factura) ? STATE.items_factura : []);
+  const totalFacturado = itemsFactura.reduce((s, it) => s + (parseFloat(it.costo) || 0), 0);
   const modalidad = px.modalidad || "A pie";
 
   // Prioridad y CTAS (NUNCA mostrar prioridad 1 si es un paciente en espera no clasificado)
@@ -12025,8 +12327,24 @@ function abrirModalDetalleYTrazabilidad(id) {
     if (raw) logsHistorial = JSON.parse(raw);
   } catch(e){}
 
+  const hcPx = snap.historiaClinica || px.historiaClinica || (esActivo ? STATE.historiaClinica : "") || "";
+  const dniReal = (dni && /^\d{8}$/.test(String(dni).trim())) ? String(dni).trim() : "";
+  const identUnico = (identificador && !["—", "NN", "PACIENTE", "Desconocido"].includes(identificador)) ? identificador : "";
+
   const logsPx = logsHistorial.filter(l => {
-    return (l.dni && dni && l.dni === dni) || (l.detalle && (l.detalle.includes(identificador) || l.detalle.includes(px.id)));
+    if (!l) return false;
+    // 1. Si el log tiene pacienteId explícito, exigir coincidencia exacta con este paciente
+    if (l.pacienteId) {
+      return l.pacienteId === px.id;
+    }
+    // 2. Fallback estricto solo por identificadores únicos reales (nunca "—" ni "NN" genérico)
+    if (dniReal && l.dni && String(l.dni).trim() === dniReal) return true;
+    if (hcPx && l.hc && l.hc === hcPx) return true;
+    const det = String(l.detalle || "");
+    if (px.id && det.includes(px.id)) return true;
+    if (hcPx && det.includes(hcPx)) return true;
+    if (identUnico && det.includes(identUnico)) return true;
+    return false;
   });
 
   if (title) title.textContent = `Expediente & Trazabilidad: ${identificador} (${nombre})`;
@@ -12048,7 +12366,7 @@ function abrirModalDetalleYTrazabilidad(id) {
       <div style="display:flex; gap:12px; margin-top:8px; font-size:0.75rem; color:#475569; flex-wrap:wrap;">
         <span>Financiador: <strong style="color:#0f172a;">${seguro}</strong></span>
         <span>•</span>
-        <span>Doc. Asistencial: <strong style="color:#0284c7;">${(seguro === "EsSalud" || snap.tipoIpressPublica === "ESSALUD") ? (snap.nroEssi || px.nroEssi || STATE.nroEssi || "ESSI-Pendiente") : (snap.nroFua || px.nroFua || STATE.nroFua || "FUA-Pendiente")}</strong></span>
+        <span>Doc. Asistencial: <strong style="color:#0284c7;">${docAsistencial}</strong></span>
         <span>•</span>
         <span>Ubicación/Cama: <strong style="color:#15803d;">${cama}</strong></span>
         <span>•</span>
@@ -12118,15 +12436,15 @@ function abrirModalDetalleYTrazabilidad(id) {
           <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${prio ? '✓ Clasificado' : '⏳ Pendiente'}</div>
           <div style="font-size:0.68rem; color:#64748b;">${prio ? `Nivel P-${prio}` : 'En sala de espera'}</div>
         </div>
-        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${snap.coberturaValidada ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
-          <div style="font-size:0.70rem; font-weight:800; color:${snap.coberturaValidada ? '#059669' : '#64748b'};">3. Admisión / Seguro</div>
-          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${snap.coberturaValidada ? '✓ Validado' : '⏳ Pendiente'}</div>
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${seguroValidado ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
+          <div style="font-size:0.70rem; font-weight:800; color:${seguroValidado ? '#059669' : '#64748b'};">3. Admisión / Seguro</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${seguroValidado ? '✓ Validado' : '⏳ Pendiente'}</div>
           <div style="font-size:0.68rem; color:#64748b;">${seguro}</div>
         </div>
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-top:3px solid ${snap.cie10 || snap.diagnosticoCIE10 ? '#10b981' : '#cbd5e1'}; border-radius:8px; padding:8px;">
           <div style="font-size:0.70rem; font-weight:800; color:${snap.cie10 || snap.diagnosticoCIE10 ? '#059669' : '#64748b'};">4. Atención Médica</div>
-          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${snap.cie10 || snap.diagnosticoCIE10 ? '✓ Evaluado' : '⏳ En curso'}</div>
-          <div style="font-size:0.68rem; color:#64748b;">${String(cie10).substring(0, 20)}...</div>
+          <div style="font-size:0.76rem; font-weight:700; color:#0f172a; margin-top:2px;">${snap.cie10 || snap.diagnosticoCIE10 ? '✓ Evaluado' : (snap.medicoTratante ? '⏳ En curso' : '⏳ Pendiente')}</div>
+          <div style="font-size:0.68rem; color:#64748b;">${snap.cie10 || snap.diagnosticoCIE10 ? String(cie10).substring(0, 20) + '...' : 'Sin diagnóstico CIE-10 aún'}</div>
         </div>
       </div>
     </div>
@@ -12164,6 +12482,46 @@ function abrirModalDetalleYTrazabilidad(id) {
         ` : `
           <div style="padding:14px; text-align:center; color:#94a3b8; font-size:0.75rem;">
             No se registran eventos críticos de auditoría previos para este paciente (Paciente recién ingresado).
+          </div>
+        `}
+      </div>
+    </div>
+
+    <!-- 4B. Facturación & Liquidación Real (Acumulada por Flujo) -->
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-size:0.80rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.5px;">
+          💳 Facturación &amp; Liquidación Real (${itemsFactura.length} cargos)
+        </div>
+        <span style="font-size:0.75rem; font-weight:800; color:${itemsFactura.length > 0 ? '#0f766e' : '#64748b'};">
+          Total Bruto: S/ ${totalFacturado.toFixed(2)}
+        </span>
+      </div>
+      <div style="max-height:130px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px;">
+        ${itemsFactura.length > 0 ? `
+          <table style="width:100%; border-collapse:collapse; font-size:0.72rem; text-align:left;">
+            <thead>
+              <tr style="background:#f1f5f9; color:#334155;">
+                <th style="padding:5px 8px;">Hora</th>
+                <th style="padding:5px 8px;">Categoría</th>
+                <th style="padding:5px 8px;">Concepto</th>
+                <th style="padding:5px 8px; text-align:right;">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsFactura.map((it, idx) => `
+                <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom:1px solid #e2e8f0;">
+                  <td style="padding:4px 8px; font-family:monospace; color:#64748b;">${it.timestamp || '—'}</td>
+                  <td style="padding:4px 8px; font-weight:700; color:#475569;">${it.categoria || 'General'}</td>
+                  <td style="padding:4px 8px; color:#0f172a;">${it.servicio}</td>
+                  <td style="padding:4px 8px; text-align:right; font-weight:700; color:#0f766e;">S/ ${(parseFloat(it.costo) || 0).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : `
+          <div style="padding:12px; text-align:center; color:#94a3b8; font-size:0.75rem;">
+            Sin cargos facturados aún — se genera estrictamente conforme avanza la atención.
           </div>
         `}
       </div>
@@ -12572,18 +12930,54 @@ function mostrarToastCola(htmlMsg) {
   }, 4500);
 }
 
+function abrirModalIngresoEspera() {
+  const m = document.getElementById("modal_ingreso_espera");
+  if (!m) { registrarPacienteEnEspera("A pie"); return; }
+  const rPie = document.querySelector('input[name="espera_forma_llegada"][value="A pie"]');
+  if (rPie) rPie.checked = true;
+  m.classList.add("open");
+  m.classList.add("show");
+  m.style.setProperty("display", "flex", "important");
+}
+window.abrirModalIngresoEspera = abrirModalIngresoEspera;
+
+function cerrarModalIngresoEspera() {
+  const m = document.getElementById("modal_ingreso_espera");
+  if (!m) return;
+  m.classList.remove("open");
+  m.classList.remove("show");
+  m.style.setProperty("display", "none", "important");
+}
+window.cerrarModalIngresoEspera = cerrarModalIngresoEspera;
+
+function confirmarPacienteEnEsperaModal() {
+  const modalidad = document.querySelector('input[name="espera_forma_llegada"]:checked')?.value || "A pie";
+  cerrarModalIngresoEspera();
+  registrarPacienteEnEspera(modalidad);
+}
+window.confirmarPacienteEnEsperaModal = confirmarPacienteEnEsperaModal;
+
 function registrarPacienteEnEspera(modalidadForzada) {
+  // Si no se indicó forma de llegada explícita, abrir modal para que el usuario la elija (no asignar al azar)
+  if (!(typeof modalidadForzada === "string" && modalidadForzada.trim())) {
+    const m = document.getElementById("modal_ingreso_espera");
+    if (m) {
+      abrirModalIngresoEspera();
+      return;
+    }
+  }
+
   // 1. Guardar de forma segura el paciente que estaba activo previamente
   guardarEstadoPacienteActivo();
 
-  // 2. Generar ticket y registro único para el nuevo paciente en espera (variando forma de llegada)
+  // 2. Generar ticket y registro único para el nuevo paciente en espera con la forma de llegada elegida
   const num = contadorSecuencialPx++;
   const ticketStr = `Ticket T-${String(num).padStart(3, '0')}`;
   const nombrePx = `Paciente #${num} (En Espera)`;
   const idPx = `PX-ESP-${num}-${Date.now().toString(36).slice(-4)}`;
   const modalidadLlegada = (typeof modalidadForzada === "string" && modalidadForzada.trim())
     ? modalidadForzada.trim()
-    : obtenerModalidadIngresoVariada(num);
+    : "A pie";
 
   const nuevoPx = crearRegistroPaciente({
     numero: num,
@@ -13867,22 +14261,28 @@ function renderizarBadgesPadronSusalud(padron) {
 // En Público: Hospital MINSA, Hospital EsSalud y Sin Seguro
 // ---------------------------------------------------------------------------
 function actualizarVisibilidadBotonesEntorno() {
-  const modo = STATE.entornoOperativo || "publico";
+  const modo = STATE.entornoOperativo || "sis";
   const btnMinsa = document.getElementById("btn_entorno_minsa");
   const btnEssalud = document.getElementById("btn_entorno_essalud");
   const btnCli = document.getElementById("btn_entorno_clinica_eps");
   const btnPart = document.getElementById("btn_entorno_particular");
 
   if (modo === "privado") {
-    // EN PESTAÑA PRIVADA: SOLO DEBE APARECER EPS Y SIN SEGURO
+    // EN PESTAÑA PRIVADA: EPS, SIS/EsSalud en Clínica (Ley 27604) y Sin Seguro
     if (btnMinsa) btnMinsa.style.setProperty("display", "none", "important");
     if (btnEssalud) btnEssalud.style.setProperty("display", "none", "important");
     if (btnCli) btnCli.style.setProperty("display", "flex", "important");
     if (btnPart) btnPart.style.setProperty("display", "flex", "important");
-  } else {
-    // EN PESTAÑA PÚBLICA: MINSA, EsSalud y Sin seguro
-    if (btnMinsa) btnMinsa.style.setProperty("display", "flex", "important");
+  } else if (modo === "essalud") {
+    // EN PESTAÑA ESSALUD: Hospital EsSalud (ESSI) y Sin Seguro
+    if (btnMinsa) btnMinsa.style.setProperty("display", "none", "important");
     if (btnEssalud) btnEssalud.style.setProperty("display", "flex", "important");
+    if (btnCli) btnCli.style.setProperty("display", "none", "important");
+    if (btnPart) btnPart.style.setProperty("display", "flex", "important");
+  } else {
+    // EN PESTAÑA MINSA/SIS: Hospital MINSA (SIS/FUA) y Sin Seguro
+    if (btnMinsa) btnMinsa.style.setProperty("display", "flex", "important");
+    if (btnEssalud) btnEssalud.style.setProperty("display", "none", "important");
     if (btnCli) btnCli.style.setProperty("display", "none", "important");
     if (btnPart) btnPart.style.setProperty("display", "flex", "important");
   }
@@ -13890,20 +14290,23 @@ function actualizarVisibilidadBotonesEntorno() {
 window.actualizarVisibilidadBotonesEntorno = actualizarVisibilidadBotonesEntorno;
 
 function cambiarEntornoOperativo(modo) {
-  const modoAnterior = STATE.entornoOperativo || "publico";
-  const nuevoModo = (modo === "privado") ? "privado" : "publico";
-  const debeBorrarAvance = (nuevoModo === "privado" && (modoAnterior === "publico" || STATE.numDni || STATE.identificador || (document.getElementById("dni_mod1")?.value) || (document.getElementById("ident_full")?.value)));
+  const modoAnterior = STATE.entornoOperativo || "sis";
+  const nuevoModo = (modo === "privado") ? "privado" : ((modo === "essalud") ? "essalud" : "sis");
+  const cambioDeSector = (nuevoModo !== modoAnterior);
+  const hayDatosEnCurso = Boolean(STATE.numDni || STATE.identificador || (document.getElementById("dni_mod1")?.value) || (document.getElementById("ident_full")?.value));
+  const debeBorrarAvance = (nuevoModo === "privado" && modoAnterior !== "privado" && hayDatosEnCurso);
 
   STATE.entornoOperativo = nuevoModo;
   STATE.esClinicaPrivada = (nuevoModo === "privado");
+  STATE.tipoIpressPublica = (nuevoModo === "essalud") ? "ESSALUD" : ((nuevoModo === "sis") ? "MINSA" : "PARTICULAR");
 
   if (debeBorrarAvance) {
-    // Requerimiento: Si ya estoy ingresando los datos en SIS o ESSALUD, al cambiar de pestaña a Privado se borra el avance
     if (typeof limpiarFormularioCompletoState === "function") {
       limpiarFormularioCompletoState();
     }
     STATE.entornoOperativo = "privado";
     STATE.esClinicaPrivada = true;
+    STATE.tipoIpressPublica = "PARTICULAR";
     STATE.tipoSeguro = "Particular";
     STATE.planPrivado = "base_80_20";
 
@@ -13931,63 +14334,72 @@ function cambiarEntornoOperativo(modo) {
     if (typeof mostrarToastCola === "function") {
       mostrarToastCola("🔄 <strong>Entorno Privado:</strong> Se ha borrado el avance anterior para iniciar un ingreso limpio en sector privado.");
     }
-  } else {
-    // Bloque 6: Persistencia del seguro SITEDS por DNI al alternar modo Público y Privado
-    const dniAct = STATE.numDni || (document.getElementById("dni_reniec_input")?.value) || (document.getElementById("dni_mod1")?.value) || "";
-    STATE.segurosSitedsPorDni = STATE.segurosSitedsPorDni || {};
-    if (dniAct) {
-      if (nuevoModo === "publico" && STATE.planPrivado) {
-        STATE.segurosSitedsPorDni[dniAct] = {
-          planPrivado: STATE.planPrivado,
-          tipoSeguro: STATE.tipoSeguro,
-          padronPrivado: STATE.padronSusalud?.privado ? JSON.parse(JSON.stringify(STATE.padronSusalud.privado)) : null
-        };
-      } else if (nuevoModo === "privado" && STATE.segurosSitedsPorDni[dniAct]) {
-        const guardado = STATE.segurosSitedsPorDni[dniAct];
-        if (guardado.planPrivado) {
-          STATE.planPrivado = guardado.planPrivado;
-          const selPlan = document.getElementById("select_plan_privado");
-          if (selPlan) selPlan.value = guardado.planPrivado;
-        }
-        if (guardado.tipoSeguro && guardado.tipoSeguro !== "Particular") {
-          STATE.tipoSeguro = guardado.tipoSeguro;
-        }
-        if (guardado.padronPrivado && STATE.padronSusalud) {
-          STATE.padronSusalud.privado = guardado.padronPrivado;
-        }
-      }
+  } else if (cambioDeSector && nuevoModo === "sis") {
+    const selSis = document.getElementById("select_condicion_sis");
+    if (selSis && (!STATE.tipoSeguro || STATE.tipoSeguro === "Por verificar" || STATE.tipoSeguro === "EsSalud")) {
+      selSis.value = "SIS";
+      if (typeof cambiarCondicionSis === "function") cambiarCondicionSis("SIS");
+    }
+  } else if (cambioDeSector && nuevoModo === "essalud") {
+    const selEss = document.getElementById("select_condicion_essalud");
+    if (selEss && (!STATE.tipoSeguro || STATE.tipoSeguro === "Por verificar" || STATE.tipoSeguro === "SIS")) {
+      selEss.value = "EsSalud";
+      if (typeof cambiarCondicionEssalud === "function") cambiarCondicionEssalud("EsSalud");
     }
   }
 
-  // Actualizar estilos de los botones del selector
-  const btnPub = document.getElementById("tab_entorno_publico");
+  // Actualizar estilos de las 3 pestañas simétricas (MINSA/SIS, EsSalud, Privado EPS)
+  const btnSis = document.getElementById("tab_entorno_sis");
+  const btnEss = document.getElementById("tab_entorno_essalud");
   const btnPriv = document.getElementById("tab_entorno_privado");
   const txtBanner = document.getElementById("entorno_sector_info_texto");
   const badgeSector = document.getElementById("badge_sector_factura");
 
-  if (nuevoModo === "publico") {
-    if (btnPub) {
-      btnPub.classList.add("active");
-      btnPub.style.border = "2.5px solid #0284c7";
-      btnPub.style.background = "#eff6ff";
-      btnPub.style.color = "#0369a1";
-      btnPub.style.boxShadow = "0 2px 6px rgba(2,132,199,0.18)";
-    }
-    if (btnPriv) {
-      btnPriv.classList.remove("active");
-      btnPriv.style.border = "2px solid #e2e8f0";
-      btnPriv.style.background = "#f8fafc";
-      btnPriv.style.color = "#64748b";
-      btnPriv.style.boxShadow = "none";
+  const resetTab = (b) => {
+    if (!b) return;
+    b.classList.remove("active");
+    b.style.border = "2px solid #e2e8f0";
+    b.style.background = "#f8fafc";
+    b.style.color = "#64748b";
+    b.style.boxShadow = "none";
+  };
+  resetTab(btnSis);
+  resetTab(btnEss);
+  resetTab(btnPriv);
+
+  if (nuevoModo === "sis") {
+    if (btnSis) {
+      btnSis.classList.add("active");
+      btnSis.style.border = "2.5px solid #0284c7";
+      btnSis.style.background = "#eff6ff";
+      btnSis.style.color = "#0369a1";
+      btnSis.style.boxShadow = "0 2px 6px rgba(2,132,199,0.18)";
     }
     if (txtBanner) {
-      txtBanner.innerHTML = "<strong>Regla Sectorial Activa:</strong> Afiliados SIS y EsSalud gozan de cobertura al 100% (Pago S/ 0.00). Pacientes particulares o con seguro privado puro pagan 100%.";
+      txtBanner.innerHTML = "<strong>Regla MINSA / SIS (R.J. N° 081-2014/SIS &amp; Ley N° 27604):</strong> Asegurado SIS cubierto al 100% vía FUA (Pago S/ 0.00). No Asegurado en CTAS I-II protegido por Ley N° 27604; en CTAS III-V paga Tarifa MINSA. EsSalud/EPS en CTAS I-II: Ley N° 27604 + D.L. N° 1302.";
     }
     if (badgeSector) {
-      badgeSector.textContent = "Sector: Modo Público (MINSA / SIS / EsSalud)";
+      badgeSector.textContent = "Sector: Hospital MINSA / SIS (FUA)";
       badgeSector.style.background = "#eff6ff";
-      badgeSector.style.color = "#1d4ed8";
+      badgeSector.style.color = "#0369a1";
       badgeSector.style.border = "1px solid #bfdbfe";
+    }
+  } else if (nuevoModo === "essalud") {
+    if (btnEss) {
+      btnEss.classList.add("active");
+      btnEss.style.border = "2.5px solid #0d9488";
+      btnEss.style.background = "#f0fdfa";
+      btnEss.style.color = "#0f766e";
+      btnEss.style.boxShadow = "0 2px 6px rgba(13,148,136,0.18)";
+    }
+    if (txtBanner) {
+      txtBanner.innerHTML = "<strong>Regla EsSalud / ESSI (Ley N° 26790 &amp; Ley N° 27604):</strong> Asegurado EsSalud cubierto al 100% vía Hoja ESSI (Pago S/ 0.00). No Asegurado en CTAS I-II protegido por Ley N° 27604; en CTAS III-V paga Tarifa No Asegurado EsSalud. SIS/EPS en CTAS I-II: Ley N° 27604 + D.L. N° 1302.";
+    }
+    if (badgeSector) {
+      badgeSector.textContent = "Sector: Hospital EsSalud (Hoja ESSI)";
+      badgeSector.style.background = "#f0fdfa";
+      badgeSector.style.color = "#0f766e";
+      badgeSector.style.border = "1px solid #99f6e4";
     }
   } else {
     if (btnPriv) {
@@ -13997,44 +14409,38 @@ function cambiarEntornoOperativo(modo) {
       btnPriv.style.color = "#6d28d9";
       btnPriv.style.boxShadow = "0 2px 6px rgba(124,58,237,0.18)";
     }
-    if (btnPub) {
-      btnPub.classList.remove("active");
-      btnPub.style.border = "2px solid #e2e8f0";
-      btnPub.style.background = "#f8fafc";
-      btnPub.style.color = "#64748b";
-      btnPub.style.boxShadow = "none";
-    }
     if (txtBanner) {
-      txtBanner.innerHTML = "<strong>Regla Sectorial Activa:</strong> Afiliados EPS con póliza activa cubiertos según copago y coaseguro (o 100% en P-I/II Ley N° 27604). Afiliados SIS o Solo EsSalud pagan 100% como particulares.";
+      txtBanner.innerHTML = "<strong>Regla Clínica Privada (SITEDS &amp; Ley N° 27604):</strong> Afiliados EPS cubiertos según copago/coaseguro de póliza (P-I/II Ley N° 27604). Afiliados SIS, EsSalud o No Asegurados en CTAS I-II protegidos por Ley N° 27604 hasta estabilización; en CTAS III-V pagan 100% tarifa clínica.";
     }
     if (badgeSector) {
-      badgeSector.textContent = "Sector: Modo Privado (Clínica / EPS / SITEDS)";
+      badgeSector.textContent = "Sector: Clínica Privada (EPS / SITEDS)";
       badgeSector.style.background = "#f5f3ff";
       badgeSector.style.color = "#6d28d9";
       badgeSector.style.border = "1px solid #ddd6fe";
     }
   }
 
-  // Alternar sub-selectores según entorno
-  const boxIpress = document.getElementById("subselector_ipress_publica");
+  // Alternar sub-selectores simétricos según módulo
+  const boxSis = document.getElementById("subselector_ipress_sis");
+  const boxEss = document.getElementById("subselector_ipress_essalud");
   const boxPlanPriv = document.getElementById("subselector_plan_privado");
-  if (nuevoModo === "publico") {
-    if (boxIpress) boxIpress.style.display = "flex";
-    if (boxPlanPriv) boxPlanPriv.style.display = "none";
-  } else {
-    if (boxIpress) boxIpress.style.display = "none";
-    if (boxPlanPriv) boxPlanPriv.style.display = "flex";
-  }
+  if (boxSis) boxSis.style.display = (nuevoModo === "sis") ? "flex" : "none";
+  if (boxEss) boxEss.style.display = (nuevoModo === "essalud") ? "flex" : "none";
+  if (boxPlanPriv) boxPlanPriv.style.display = (nuevoModo === "privado") ? "flex" : "none";
 
   actualizarVisibilidadBotonesEntorno();
   actualizarVistaSegunEntornoOperativo();
+  if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
   actualizarFactura();
 
   if (typeof recalcularPrioridad === "function") {
     try { recalcularPrioridad(); } catch(e){}
   }
 
-  mostrarToastCola(`⚙️ <strong>Entorno Operativo:</strong> Cambiado a ${nuevoModo === 'publico' ? '🏛️ Modo Público (MINSA/SIS/EsSalud)' : '🏥 Modo Privado (Clínica/EPS/SITEDS)'}.`);
+  const etiquetaToast = nuevoModo === "sis"
+    ? "🏛️ Módulo MINSA / SIS (FUA)"
+    : (nuevoModo === "essalud" ? "🏥 Módulo EsSalud (Hoja ESSI)" : "🏢 Módulo Privado (Clínica / EPS)");
+  mostrarToastCola(`⚙️ <strong>Entorno Operativo:</strong> Cambiado a ${etiquetaToast}.`);
 }
 
 function toggleCondicionFugaTransversal(chk) {
@@ -15750,6 +16156,8 @@ function registrarLogAuditoria(modulo, evento, detalle) {
   const logItem = {
     timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
     rol: "Facultativo / Auditor HIS",
+    pacienteId: (typeof pacienteActivoId !== "undefined" && pacienteActivoId) ? pacienteActivoId : "",
+    hc: (typeof STATE !== "undefined" && STATE?.historiaClinica) ? STATE.historiaClinica : "",
     dni: STATE.numDni || (STATE.esNN ? "NN" : "—"),
     modulo: modulo,
     evento: evento,
@@ -17558,6 +17966,62 @@ window.admitirEmergenciaNN = admitirEmergenciaNN;
 // ==============================================================================
 // GESTIÓN DE SUB-SELECTORES: IPRESS PÚBLICA (FUA / ESSI) Y PLANES PRIVADOS EPS
 // ==============================================================================
+function cambiarCondicionSis(valor) {
+  STATE.entornoOperativo = "sis";
+  STATE.esClinicaPrivada = false;
+  STATE.tipoIpressPublica = "MINSA";
+  STATE.tipoSeguro = valor || "SIS";
+  if (STATE.tipoSeguro === "SIS") {
+    STATE.nroFua = STATE.nroFua || `FUA-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    STATE.numerFua = STATE.nroFua;
+    STATE.estadoFua = STATE.estadoFua || "ABIERTO";
+  } else {
+    STATE.nroFua = "";
+    STATE.numerFua = "";
+  }
+  const pxActivo = (PACIENTES_COLA || []).find(p => p.id === pacienteActivoId);
+  if (pxActivo) {
+    pxActivo.entornoOperativo = "sis";
+    pxActivo.tipoSeguro = STATE.tipoSeguro;
+    pxActivo.tipoIpressPublica = "MINSA";
+    pxActivo.nroFua = STATE.nroFua;
+  }
+  actualizarFactura();
+  if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
+  if (window.COCKPIT && typeof window.COCKPIT.actualizarTarjetaResumenTriaje === "function") {
+    window.COCKPIT.actualizarTarjetaResumenTriaje();
+  }
+}
+window.cambiarCondicionSis = cambiarCondicionSis;
+
+function cambiarCondicionEssalud(valor) {
+  STATE.entornoOperativo = "essalud";
+  STATE.esClinicaPrivada = false;
+  STATE.tipoIpressPublica = "ESSALUD";
+  STATE.tipoSeguro = valor || "EsSalud";
+  if (STATE.tipoSeguro === "EsSalud") {
+    STATE.nroEssi = STATE.nroEssi || `ESSI-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    STATE.estadoEssi = STATE.estadoEssi || "ABIERTO";
+    STATE.acreditadoEsSalud = true;
+  } else {
+    STATE.nroEssi = "";
+    STATE.acreditadoEsSalud = false;
+  }
+  const pxActivo = (PACIENTES_COLA || []).find(p => p.id === pacienteActivoId);
+  if (pxActivo) {
+    pxActivo.entornoOperativo = "essalud";
+    pxActivo.tipoSeguro = STATE.tipoSeguro;
+    pxActivo.tipoIpressPublica = "ESSALUD";
+    pxActivo.nroEssi = STATE.nroEssi;
+  }
+  actualizarFactura();
+  if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
+  if (window.COCKPIT && typeof window.COCKPIT.actualizarTarjetaResumenTriaje === "function") {
+    window.COCKPIT.actualizarTarjetaResumenTriaje();
+  }
+}
+window.cambiarCondicionEssalud = cambiarCondicionEssalud;
+
 function cambiarIpressPublica(valor) {
   STATE.tipoIpressPublica = valor || "MINSA";
   if (valor === "MINSA") {
@@ -18829,10 +19293,17 @@ window.verDetallePacienteHistorico = verDetallePacienteHistorico;
  * Actualiza dinámicamente las etiquetas y números de formato en los botones de M2, M3 (Médico) y M8 (Caja)
  */
 function actualizarBotonesFormatoPublico() {
-  const esEsSalud = (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD");
-  const docTipo = esEsSalud ? "ESSI" : "FUA";
-  const numDoc = esEsSalud ? (STATE.nroEssi || "ESSI-2026-000000") : (STATE.nroFua || "FUA-2026-000000");
+  const esEsSalud = (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD" || STATE.entornoOperativo === "essalud");
+  const numDoc = esEsSalud ? (STATE.nroEssi || "Pendiente") : (STATE.nroFua || "Pendiente");
 
+  const btnFua = document.getElementById("btn_ver_formato_fua");
+  if (btnFua) {
+    btnFua.textContent = `📄 Ver FUA (${STATE.nroFua || "Apertura"})`;
+  }
+  const btnEssi = document.getElementById("btn_ver_formato_essi");
+  if (btnEssi) {
+    btnEssi.textContent = `📄 Ver Hoja ESSI (${STATE.nroEssi || "Apertura"})`;
+  }
   const btnM2 = document.getElementById("btn_ver_formato_publico");
   if (btnM2) {
     btnM2.textContent = esEsSalud ? `📄 Ver Hoja ESSI (${numDoc})` : `📄 Ver Formato FUA (${numDoc})`;
