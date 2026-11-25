@@ -7701,6 +7701,9 @@ async function grabarAtencionCompleta() {
   if (typeof renderizarTableroColaPacientes === "function") {
     renderizarTableroColaPacientes();
   }
+  if (typeof renderizarCarruselPreTriaje === "function") {
+    renderizarCarruselPreTriaje();
+  }
 }
 function mostrarModalRegistroExitoso(ep) {
   const modal = document.getElementById("modal_registro_guardado");
@@ -11878,9 +11881,13 @@ function renderizarTableroColaPacientes() {
         return p.terminoFlujo === true || p.altaClinicaConcluida === true || ef === "CERRADO_FACTURADO" || ef === "ALTA_CLINICA" || ea === "Atendido" || ea === "Alta" || ea === "Cerrado" || ea.includes("Alta");
       });
 
-  // FILTRO CLAVE: Solo mostrar pacientes que están en proceso de atención activa
-  // Cuando se les da de alta médica o cierre, desaparecen de aquí (pero se conservan en la Bandeja de Posta para trazabilidad)
-  const pacientesActivosEnCurso = (PACIENTES_COLA || []).filter(p => !fnFinalizado(p));
+  // Mostrar en el Tablero de Atención tanto pacientes en curso como los que concluyeron (marcados como "✅ Atendido")
+  // mientras que la Cola de Espera Pre-Triaje sí los oculta al haber sido atendidos.
+  const todosEnTablero = Array.isArray(PACIENTES_COLA) ? [...PACIENTES_COLA] : [];
+  todosEnTablero.sort((a, b) => (fnFinalizado(a) ? 1 : 0) - (fnFinalizado(b) ? 1 : 0));
+  const pacientesActivosEnCurso = todosEnTablero;
+  const totalActivosReal = todosEnTablero.filter(p => !fnFinalizado(p)).length;
+  const totalAtendidosReal = todosEnTablero.filter(p => fnFinalizado(p)).length;
 
   const hayFiltro = (filtroTableroPrioridad !== "TODAS" || filtroTableroFlujo !== "TODOS");
   const btnLimpiar = document.getElementById("btn_limpiar_filtros_tablero");
@@ -11912,7 +11919,9 @@ function renderizarTableroColaPacientes() {
       countBadge.style.background = "#eef2ff";
       countBadge.style.color = "#4338ca";
     } else {
-      countBadge.textContent = `${pacientesActivosEnCurso.length} ${pacientesActivosEnCurso.length === 1 ? 'Paciente en atención activa' : 'Pacientes en atención activa'}`;
+      countBadge.textContent = totalAtendidosReal > 0
+        ? `${totalActivosReal} en atención activa · ${totalAtendidosReal} atendidos`
+        : `${totalActivosReal} ${totalActivosReal === 1 ? 'Paciente en atención activa' : 'Pacientes en atención activa'}`;
       countBadge.style.background = "";
       countBadge.style.color = "";
     }
@@ -11952,8 +11961,8 @@ function renderizarTableroColaPacientes() {
     "ADMISION": { bg: "#e0f2fe", text: "#0369a1", label: "📋 Admisión" },
     "EN_ATENCION_MEDICA": { bg: "#f0fdf4", text: "#166534", label: "👨‍⚕️ Atención Médica" },
     "PENDIENTE_CAJA": { bg: "#fdf4ff", text: "#86198f", label: "💳 Pendiente Caja" },
-    "CERRADO_FACTURADO": { bg: "#f1f5f9", text: "#475569", label: "🏁 Cerrado" },
-    "ALTA_CLINICA": { bg: "#dcfce7", text: "#166534", label: "🏁 Alta Médica" }
+    "CERRADO_FACTURADO": { bg: "#dcfce7", text: "#15803d", label: "✅ Atendido" },
+    "ALTA_CLINICA": { bg: "#dcfce7", text: "#15803d", label: "✅ Atendido" }
   };
 
   pacientesFiltrados.forEach(p => {
@@ -12147,6 +12156,7 @@ function cambiarPacienteActivo(nuevoId, forzarRehidratacion = false) {
 
   // 3. Renderizar nuevamente el tablero para resaltar la tarjeta activa
   renderizarTableroColaPacientes();
+  if (typeof renderizarCarruselPreTriaje === "function") renderizarCarruselPreTriaje();
   if (typeof renderizarTrackBoardLista === "function") renderizarTrackBoardLista();
   if (typeof renderizarTablaKardexEnfermeria === "function") renderizarTablaKardexEnfermeria();
   if (typeof actualizarTarjetaResumenMedico === "function") actualizarTarjetaResumenMedico();
@@ -12221,9 +12231,9 @@ function cerrarAtencionPaciente(id, event) {
     liberarCamaTotalPaciente(id, "Alta de Emergencia / Cierre de Atención");
   }
 
-  // Marcar formalmente como cerrado / alta (conservándose en la cola para la Bandeja de Posta)
+  // Marcar formalmente como Atendido (desaparece de Pre-Triaje y se muestra como "✅ Atendido" en el Tablero)
   px.estadoFlujo = "CERRADO_FACTURADO";
-  px.estadoAtencion = "Alta Médica / Cerrado";
+  px.estadoAtencion = "Atendido";
   px.horaAlta = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
   px.altaClinicaConcluida = true;
   px.terminoFlujo = true;
@@ -12254,6 +12264,7 @@ function cerrarAtencionPaciente(id, event) {
   } catch(e) {}
 
   renderizarTableroColaPacientes();
+  if (typeof renderizarCarruselPreTriaje === "function") renderizarCarruselPreTriaje();
   if (typeof renderizarTrackBoardLista === "function") renderizarTrackBoardLista();
   if (typeof renderizarBandejaPosta === "function") renderizarBandejaPosta();
   if (typeof notificarCambioColaGlobal === "function") notificarCambioColaGlobal("ACTUALIZAR");
@@ -18746,6 +18757,9 @@ function seleccionarDestinoPostTopico(ruta) {
     if (typeof renderizarTableroColaPacientes === "function") {
       renderizarTableroColaPacientes();
     }
+    if (typeof renderizarCarruselPreTriaje === "function") {
+      renderizarCarruselPreTriaje();
+    }
     STATE.camaAsignadaId = null;
     STATE.camaAsignada = null;
     if (lblBadge) {
@@ -19338,11 +19352,11 @@ window.actualizarBotonesFormatoPublico = actualizarBotonesFormatoPublico;
 /**
  * Despachador principal que detecta si el paciente activo pertenece a EsSalud o a MINSA/SIS
  */
-function imprimirFormatoPublicoSegunRegimen() {
-  if (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD") {
-    imprimirFormatoESSI();
+function imprimirFormatoPublicoSegunRegimen(etapa = "CONSULTA") {
+  if (STATE.tipoSeguro === "EsSalud" || STATE.tipoIpressPublica === "ESSALUD" || STATE.entornoOperativo === "essalud") {
+    imprimirFormatoESSI(etapa);
   } else {
-    imprimirFormatoFUA();
+    imprimirFormatoFUA(etapa);
   }
 }
 window.imprimirFormatoPublicoSegunRegimen = imprimirFormatoPublicoSegunRegimen;
@@ -19351,12 +19365,18 @@ window.imprimirFormatoPublicoSegunRegimen = imprimirFormatoPublicoSegunRegimen;
  * Genera e imprime el FORMATO ÚNICO DE ATENCIÓN (FUA) Oficial de MINSA / SIS
  * Normativa: R.J. N° 081-2014/SIS y modificatorias. Firma del paciente en blanco, firma digital simulada del personal de salud.
  */
-function imprimirFormatoFUA() {
+function imprimirFormatoFUA(etapa = "CONSULTA") {
   const w = window.open("", "_blank");
   if (!w) { alert("Permita las ventanas emergentes para imprimir el Formato FUA."); return; }
 
   const nroFua = STATE.nroFua || "FUA-2026-" + Math.floor(100000 + Math.random() * 900000);
   STATE.nroFua = nroFua;
+  STATE.numerFua = nroFua;
+  const etapaNorm = String(etapa || "CONSULTA").toUpperCase();
+  STATE.estadoFua = etapaNorm === "CIERRE" ? "CERRADO" : (etapaNorm === "EVALUACION" ? "EN EVALUACIÓN (CIE-10)" : (STATE.estadoFua || "ABIERTO"));
+  const pxActFua = (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA)) ? PACIENTES_COLA.find(p => p.id === pacienteActivoId) : null;
+  if (pxActFua) { pxActFua.nroFua = nroFua; pxActFua.estadoFua = STATE.estadoFua; }
+  if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
   const nomPx = STATE.nombreReniec || STATE.identificador || "PACIENTE DESCONOCIDO (NN)";
   const dniPx = STATE.numDni || STATE.identificador || "POR REGISTRAR";
   const hcPx = STATE.historiaClinica || "HC-PROVISIONAL";
@@ -19389,10 +19409,18 @@ function imprimirFormatoFUA() {
         @media print {
           body { padding: 0; }
           .fua-container { border: 1.5px solid #000; box-shadow: none; }
+          .no-print { display: none !important; }
         }
       </style>
     </head>
     <body>
+      <div class="no-print" style="max-width:800px; margin:0 auto 10px auto; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid #cbd5e1; padding:8px 12px; border-radius:6px;">
+        <span style="font-weight:800; color:#0f172a; font-size:11px;">📄 FUA ${nroFua} · Estado: ${STATE.estadoFua}</span>
+        <div style="display:flex; gap:8px;">
+          <button type="button" onclick="window.print()" style="padding:6px 14px; background:#0284c7; color:#fff; border:none; border-radius:5px; font-weight:700; cursor:pointer;">🖨️ Imprimir / Guardar PDF</button>
+          <button type="button" onclick="window.close()" style="padding:6px 12px; background:#e2e8f0; color:#334155; border:none; border-radius:5px; font-weight:700; cursor:pointer;">✖ Cerrar</button>
+        </div>
+      </div>
       <div class="fua-container">
         <!-- ENCABEZADO OFICIAL MINSA / SIS -->
         <div class="fua-header">
@@ -19547,12 +19575,17 @@ window.imprimirFormatoFUA = imprimirFormatoFUA;
  * Genera e imprime la HOJA DE ATENCIÓN DE EMERGENCIA Y ACREDITACIÓN ESSI de EsSalud
  * Normativa: Res. N° 458-GG-ESSALUD. Firma del paciente en blanco, firma digital simulada del personal de salud.
  */
-function imprimirFormatoESSI() {
+function imprimirFormatoESSI(etapa = "CONSULTA") {
   const w = window.open("", "_blank");
   if (!w) { alert("Permita las ventanas emergentes para imprimir la Hoja de Atención ESSI."); return; }
 
   const nroEssi = STATE.nroEssi || "ESSI-2026-" + Math.floor(100000 + Math.random() * 900000);
   STATE.nroEssi = nroEssi;
+  const etapaNorm = String(etapa || "CONSULTA").toUpperCase();
+  STATE.estadoEssi = etapaNorm === "CIERRE" ? "CERRADO" : (etapaNorm === "EVALUACION" ? "EN EVALUACIÓN (CIE-10)" : (STATE.estadoEssi || "ABIERTO"));
+  const pxActEssi = (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA)) ? PACIENTES_COLA.find(p => p.id === pacienteActivoId) : null;
+  if (pxActEssi) { pxActEssi.nroEssi = nroEssi; pxActEssi.estadoEssi = STATE.estadoEssi; }
+  if (typeof actualizarBotonesFormatoPublico === "function") actualizarBotonesFormatoPublico();
   const nomPx = STATE.nombreReniec || STATE.identificador || "PACIENTE DESCONOCIDO (NN)";
   const dniPx = STATE.numDni || STATE.identificador || "POR REGISTRAR";
   const hcPx = STATE.historiaClinica || "HC-PROVISIONAL";
@@ -19586,10 +19619,18 @@ function imprimirFormatoESSI() {
         @media print {
           body { padding: 0; }
           .essi-container { border: 1.5px solid #0369a1; box-shadow: none; }
+          .no-print { display: none !important; }
         }
       </style>
     </head>
     <body>
+      <div class="no-print" style="max-width:800px; margin:0 auto 10px auto; display:flex; justify-content:space-between; align-items:center; background:#f0f9ff; border:1px solid #7dd3fc; padding:8px 12px; border-radius:6px;">
+        <span style="font-weight:800; color:#0369a1; font-size:11px;">📄 Hoja ESSI ${nroEssi} · Estado: ${STATE.estadoEssi}</span>
+        <div style="display:flex; gap:8px;">
+          <button type="button" onclick="window.print()" style="padding:6px 14px; background:#0284c7; color:#fff; border:none; border-radius:5px; font-weight:700; cursor:pointer;">🖨️ Imprimir / Guardar PDF</button>
+          <button type="button" onclick="window.close()" style="padding:6px 12px; background:#e2e8f0; color:#334155; border:none; border-radius:5px; font-weight:700; cursor:pointer;">✖ Cerrar</button>
+        </div>
+      </div>
       <div class="essi-container">
         <!-- ENCABEZADO OFICIAL ESSALUD -->
         <div class="essi-header">
