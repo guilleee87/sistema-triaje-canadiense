@@ -14348,6 +14348,14 @@ function cambiarEntornoOperativo(modo) {
     }
   }
 
+  // Sincronizar barra superior del Cockpit (redesign_cockpit.js)
+  const topBtnSis = document.getElementById("btn_sector_sis");
+  const topBtnEss = document.getElementById("btn_sector_essalud");
+  const topBtnPriv = document.getElementById("btn_sector_privado");
+  if (topBtnSis) topBtnSis.classList.toggle("active", nuevoModo === "sis");
+  if (topBtnEss) topBtnEss.classList.toggle("active", nuevoModo === "essalud");
+  if (topBtnPriv) topBtnPriv.classList.toggle("active", nuevoModo === "privado");
+
   // Actualizar estilos de las 3 pestañas simétricas (MINSA/SIS, EsSalud, Privado EPS)
   const btnSis = document.getElementById("tab_entorno_sis");
   const btnEss = document.getElementById("tab_entorno_essalud");
