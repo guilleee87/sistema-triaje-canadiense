@@ -1681,6 +1681,99 @@ function verHistoriaClinicaPacienteActual() {
 }
 window.verHistoriaClinicaPacienteActual = verHistoriaClinicaPacienteActual;
 
+function obtenerBitacoraCompletaPaciente(ident, hc, nom) {
+  const todos = [];
+  const vistos = new Set();
+  const fuentes = [];
+  if (typeof AUDIT_LOGS !== "undefined" && Array.isArray(AUDIT_LOGS)) fuentes.push(...AUDIT_LOGS);
+  try {
+    const raw = localStorage.getItem("AUDIT_LOGS_HISTORIAL");
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) fuentes.push(...arr);
+    }
+  } catch (_) {}
+
+  const idClean = String(ident || "").trim();
+  const hcClean = String(hc || "").trim();
+  const nomClean = String(nom || "").trim();
+
+  fuentes.forEach(l => {
+    if (!l) return;
+    const matchDni = idClean && idClean !== "—" && l.dni && String(l.dni).trim() === idClean;
+    const det = String(l.detalle || "");
+    const matchDet = (idClean && idClean !== "—" && det.includes(idClean)) ||
+                     (hcClean && hcClean !== "—" && det.includes(hcClean)) ||
+                     (nomClean && nomClean.length > 3 && !nomClean.includes("Paciente") && det.includes(nomClean));
+    if (matchDni || matchDet) {
+      const k = `${l.timestamp}|${l.evento}|${det}`;
+      if (!vistos.has(k)) {
+        vistos.add(k);
+        todos.push(l);
+      }
+    }
+  });
+  return todos;
+}
+
+function construirBloqueFirmasElectronicasHC(hc, enfTriaje, enfAsist, medTrat, modsAudit) {
+  const nombreMedRaw = (medTrat && medTrat !== "—") ? medTrat : "Dr. Carlos Valdivia Mendoza";
+  const matchCmpMed = nombreMedRaw.match(/CMP\s*\d+/i);
+  const cmpMed = matchCmpMed ? matchCmpMed[0].toUpperCase() : "CMP 48291";
+  const nombreMedLimpio = nombreMedRaw.replace(/\(.*?CMP.*?\)/i, "").trim() || nombreMedRaw;
+  const hashMed = Math.abs((String(hc) + nombreMedLimpio).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
+
+  let htmlFirmas = `
+    <div id="firma_electronica_medico_hc" style="width:255px; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; background:#f8fafc; text-align:center;">
+      <svg width="175" height="40" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 14 38 C 24 8, 40 44, 54 14 C 66 2, 80 36, 94 12 C 106 2, 118 30, 132 10 C 144 4, 160 26, 174 8 M 28 42 C 75 45, 125 40, 182 32" stroke="#0f2b5c" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <div style="border-top:1.5px solid #0f2b5c; padding-top:5px; font-size:0.78rem; font-weight:800; color:#0f172a;">${nombreMedLimpio}</div>
+      <div style="font-size:0.7rem; font-weight:700; color:#0369a1;">${cmpMed} · Médico Responsable</div>
+      <div style="font-size:0.64rem; color:#475569; font-family:monospace; margin-top:2px;">FIRMA ELECTRÓNICA SIMULADA · PKI-${hashMed}</div>
+    </div>
+  `;
+
+  const enfNombre = (enfAsist && enfAsist !== "—") ? enfAsist : ((enfTriaje && enfTriaje !== "—") ? enfTriaje : "Lic. Enfermería de Turno");
+  const matchCep = enfNombre.match(/CEP\s*\d+/i);
+  const cepEnf = matchCep ? matchCep[0].toUpperCase() : "CEP 084521";
+  const enfLimpio = enfNombre.replace(/\(.*?CEP.*?\)/i, "").trim() || enfNombre;
+  const hashEnf = Math.abs((String(hc) + enfLimpio).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
+
+  htmlFirmas += `
+    <div id="firma_electronica_enfermeria_hc" style="width:255px; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; background:#f0f9ff; text-align:center;">
+      <svg width="175" height="40" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 16 32 C 28 14, 46 38, 62 12 C 76 24, 90 10, 110 28 C 128 8, 146 34, 170 16 M 24 40 C 82 36, 128 42, 178 34" stroke="#0369a1" stroke-width="2.1" stroke-linecap="round"/>
+      </svg>
+      <div style="border-top:1.5px solid #0369a1; padding-top:5px; font-size:0.78rem; font-weight:800; color:#0f172a;">${enfLimpio}</div>
+      <div style="font-size:0.7rem; font-weight:700; color:#0284c7;">${cepEnf} · Lic. Enfermería</div>
+      <div style="font-size:0.64rem; color:#475569; font-family:monospace; margin-top:2px;">FIRMA ELECTRÓNICA SIMULADA · PKI-${hashEnf}</div>
+    </div>
+  `;
+
+  if (Array.isArray(modsAudit) && modsAudit.length > 0) {
+    const ultMod = modsAudit[0];
+    const audRaw = ultMod.auditor || "Dr. Ricardo Mendoza Salas (Auditor Médico)";
+    const matchCmpAud = audRaw.match(/CMP\s*\d+/i);
+    const cmpAud = ultMod.cmp || (matchCmpAud ? matchCmpAud[0].toUpperCase() : "CMP 31845");
+    const audLimpio = audRaw.replace(/\(.*?CMP.*?\)/i, "").trim() || audRaw;
+    const hashAud = Math.abs((String(hc) + audLimpio + ultMod.fecha + ultMod.hora).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
+
+    htmlFirmas += `
+      <div id="firma_electronica_auditor_hc" style="width:265px; border:1.5px solid #fcd34d; border-radius:8px; padding:10px 12px; background:#fffbeb; text-align:center;">
+        <svg width="175" height="40" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 18 34 C 36 6, 48 40, 68 16 C 84 6, 96 36, 118 12 C 134 4, 150 28, 172 14 M 22 40 C 70 38, 130 42, 176 36" stroke="#b45309" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <div style="border-top:1.5px solid #b45309; padding-top:5px; font-size:0.78rem; font-weight:800; color:#78350f;">${audLimpio}</div>
+        <div style="font-size:0.7rem; font-weight:700; color:#92400e;">${cmpAud} · Auditor Médico · IP: ${ultMod.ip}</div>
+        <div style="font-size:0.64rem; color:#b45309; font-family:monospace; margin-top:2px;">FIRMA ELECTRÓNICA AUDITOR · ${ultMod.fecha} ${ultMod.hora} · PKI-${hashAud}</div>
+      </div>
+    `;
+  }
+
+  return htmlFirmas;
+}
+
 function visualizarHistoriaClinica(pacienteEncoded) {
   let p;
   try {
@@ -1862,6 +1955,21 @@ function visualizarHistoriaClinica(pacienteEncoded) {
       `).join("")
     : `<div style="font-size:0.78rem;color:#94a3b8;padding:8px 10px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;">— (Sin atenciones en Consulta Externa)</div>`;
 
+  const bitacoraPx = obtenerBitacoraCompletaPaciente(ident, hc, master.nombre_completo || nom);
+  const htmlBitacoraPx = bitacoraPx.length > 0
+    ? bitacoraPx.map((b, bi) => `
+        <tr style="background:${bi % 2 === 0 ? "#ffffff" : "#f8fafc"}; border-bottom:1px solid #e2e8f0;">
+          <td style="padding:5px 7px; font-family:monospace; white-space:nowrap; color:#475569;">${b.timestamp || "—"}</td>
+          <td style="padding:5px 7px; font-weight:700; color:#0369a1;">${b.modulo || "—"}</td>
+          <td style="padding:5px 7px; font-weight:800; color:#0f172a;">${b.evento || "—"}</td>
+          <td style="padding:5px 7px; color:#334155;">${b.detalle || "—"}</td>
+          <td style="padding:5px 7px; color:#64748b;">${b.rol || "—"}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" style="padding:8px; text-align:center; color:#94a3b8;">Sin eventos de bitácora registrados para este paciente.</td></tr>`;
+
+  const htmlFirmasModal = construirBloqueFirmasElectronicasHC(hc, enfTriaje, enfAsist, medTrat, modsAudit);
+
   const camposPersonalizados = master.campos_personalizados && typeof master.campos_personalizados === "object"
     ? Object.entries(master.campos_personalizados).map(([ck, cv]) => `<div><strong>${ck}:</strong> ${cv}</div>`).join("")
     : "";
@@ -2031,8 +2139,32 @@ function visualizarHistoriaClinica(pacienteEncoded) {
       </div>
     </div>
 
+    <!-- 6B. BITÁCORA COMPLETA DE ATENCIÓN (CADA PASO, QUÉ, CUÁNTO, DÓNDE, CÓMO) -->
+    <div style="background:#ffffff;border:1.5px solid #cbd5e1;border-radius:12px;padding:12px 16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="margin:0;font-size:0.88rem;font-weight:900;color:#0f172a;">📜 Bitácora Completa de Atención — Paso a Paso (${bitacoraPx.length} registro${bitacoraPx.length === 1 ? "" : "s"})</h4>
+        <span style="font-size:0.72rem;color:#64748b;">Trazabilidad: Fecha/Hora · Dónde (Módulo) · Qué · Cuánto/Cómo · Responsable</span>
+      </div>
+      <div style="max-height:200px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.73rem;">
+          <thead>
+            <tr style="background:#f1f5f9;color:#334155;text-align:left;">
+              <th style="padding:6px 7px;border-bottom:1px solid #cbd5e1;">Fecha / Hora</th>
+              <th style="padding:6px 7px;border-bottom:1px solid #cbd5e1;">Dónde (Módulo)</th>
+              <th style="padding:6px 7px;border-bottom:1px solid #cbd5e1;">Paso / Acción</th>
+              <th style="padding:6px 7px;border-bottom:1px solid #cbd5e1;">Detalle (Qué, Cuánto, Cómo)</th>
+              <th style="padding:6px 7px;border-bottom:1px solid #cbd5e1;">Personal</th>
+            </tr>
+          </thead>
+          <tbody id="hc_bitacora_completa_list">
+            ${htmlBitacoraPx}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- 7. AUDITORÍA UNIVERSAL: MODIFICAR CUALQUIER CAMPO CON TRAZABILIDAD (NOMBRE, IP, DÍA, HORA, ANTES -> DESPUÉS) -->
-    <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;">
+    <div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
       ${bloqueFormularioAuditor}
       <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:0.73rem;background:#ffffff;border:1px solid #fde68a;border-radius:6px;">
@@ -2051,6 +2183,14 @@ function visualizarHistoriaClinica(pacienteEncoded) {
             ${htmlModsAudit}
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- 8. FIRMAS ELECTRÓNICAS SIMULADAS DEL PERSONAL DE SALUD (Y AUDITOR SI HUBO MODIFICACIÓN) -->
+    <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:12px;padding:14px 16px;">
+      <h4 style="margin:0 0 10px 0;font-size:0.88rem;font-weight:900;color:#0f172a;text-align:center;">✍️ Firmas Electrónicas Simuladas (Personal de Salud${modsAudit.length > 0 ? " + Auditoría" : ""})</h4>
+      <div id="hc_modal_firmas_electronicas" style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap;">
+        ${htmlFirmasModal}
       </div>
     </div>
   `;
@@ -2194,8 +2334,10 @@ async function registrarModificacionAuditorHC(ident, hc, nom, seg) {
   }
 
   if (!Array.isArray(master.modificaciones_auditoria)) master.modificaciones_auditoria = [];
+  const matchCmpAud = auditor.match(/CMP\s*\d+/i);
   master.modificaciones_auditoria.unshift({
     auditor,
+    cmp: matchCmpAud ? matchCmpAud[0].toUpperCase() : "CMP 31845",
     ip,
     fecha,
     hora,
@@ -2344,35 +2486,20 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
       `).join("")
     : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">Sin modificaciones de auditoría registradas.</td></tr>`;
 
-  // Firmas electrónicas simuladas (Médico que corresponde siempre; si hubo modificación, al costado firma del Auditor)
-  const nombreMedFirma = (medTrat && medTrat !== "—") ? medTrat : "Médico Tratante / Guardia Emergencia";
-  const hashMed = Math.abs((hc + nombreMedFirma).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
-  const bloqueFirmaMedico = `
-    <div id="firma_electronica_medico_hc" style="width:270px; border:1px solid #cbd5e1; border-radius:8px; padding:10px 12px; background:#f8fafc; text-align:center;">
-      <svg width="180" height="42" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 14 38 C 24 8, 40 44, 54 14 C 66 2, 80 36, 94 12 C 106 2, 118 30, 132 10 C 144 4, 160 26, 174 8 M 28 42 C 75 45, 125 40, 182 32" stroke="#0f2b5c" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-      <div style="border-top:1.5px solid #0f2b5c; padding-top:5px; font-size:0.78rem; font-weight:800; color:#0f172a;">${nombreMedFirma}</div>
-      <div style="font-size:0.68rem; color:#475569;">Médico Responsable · Colegio Médico del Perú</div>
-      <div style="font-size:0.64rem; color:#0369a1; font-family:monospace; margin-top:3px;">FIRMA ELECTRÓNICA SIMULADA · PKI-${hashMed}</div>
-    </div>
-  `;
+  const bitacoraPxPrint = obtenerBitacoraCompletaPaciente(ident, hc, master.nombre_completo || nom);
+  const filasBitacoraPrint = bitacoraPxPrint.length > 0
+    ? bitacoraPxPrint.map(b => `
+        <tr>
+          <td style="font-family:monospace;white-space:nowrap;">${b.timestamp || "—"}</td>
+          <td>${b.modulo || "—"}</td>
+          <td><strong>${b.evento || "—"}</strong></td>
+          <td>${b.detalle || "—"}</td>
+          <td>${b.rol || "—"}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="5" style="text-align:center;color:#94a3b8;">Sin eventos de bitácora registrados.</td></tr>`;
 
-  let bloqueFirmaAuditor = "";
-  if (modsAudit.length > 0) {
-    const ultMod = modsAudit[0];
-    const hashAud = Math.abs((hc + ultMod.auditor + ultMod.fecha + ultMod.hora).split("").reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0) | 0, 0)).toString(16).toUpperCase().padStart(8, "0");
-    bloqueFirmaAuditor = `
-      <div id="firma_electronica_auditor_hc" style="width:270px; border:1.5px solid #fcd34d; border-radius:8px; padding:10px 12px; background:#fffbeb; text-align:center;">
-        <svg width="180" height="42" viewBox="0 0 190 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M 18 34 C 36 6, 48 40, 68 16 C 84 6, 96 36, 118 12 C 134 4, 150 28, 172 14 M 22 40 C 70 38, 130 42, 176 36" stroke="#b45309" stroke-width="2.2" stroke-linecap="round"/>
-        </svg>
-        <div style="border-top:1.5px solid #b45309; padding-top:5px; font-size:0.78rem; font-weight:800; color:#78350f;">${ultMod.auditor}</div>
-        <div style="font-size:0.68rem; color:#92400e;">Auditor Médico / Verificador · IP: ${ultMod.ip}</div>
-        <div style="font-size:0.64rem; color:#b45309; font-family:monospace; margin-top:3px;">FIRMA ELECTRÓNICA AUDITOR · ${ultMod.fecha} ${ultMod.hora} · PKI-${hashAud}</div>
-      </div>
-    `;
-  }
+  const bloqueFirmasPrint = construirBloqueFirmasElectronicasHC(hc, enfTriaje, enfAsist, medTrat, modsAudit);
 
   return `
     <html><head><title>Historia Clínica Integral — ${hc}</title><style>
@@ -2465,15 +2592,21 @@ function construirHTMLImpresionHistoriaClinica(pacienteEncoded) {
         </table>
       </div>
       <div class="section-box">
-        <div class="section-title">VII. Bitácora de Modificaciones Auditadas (${modsAudit.length})</div>
+        <div class="section-title">VII. Bitácora Completa de Atención — Paso a Paso (${bitacoraPxPrint.length})</div>
+        <table>
+          <thead><tr><th>Fecha / Hora</th><th>Dónde (Módulo)</th><th>Paso / Acción</th><th>Detalle (Qué, Cuánto, Cómo)</th><th>Personal</th></tr></thead>
+          <tbody>${filasBitacoraPrint}</tbody>
+        </table>
+      </div>
+      <div class="section-box">
+        <div class="section-title">VIII. Bitácora de Modificaciones Auditadas (${modsAudit.length})</div>
         <table>
           <thead><tr><th>Auditor</th><th>IP PC</th><th>Día / Hora</th><th>Campo</th><th>Cambio Realizado</th></tr></thead>
           <tbody>${filasModsHtml}</tbody>
         </table>
       </div>
       <div class="firma-box">
-        ${bloqueFirmaMedico}
-        ${bloqueFirmaAuditor}
+        ${bloqueFirmasPrint}
       </div>
     </body></html>
   `;
@@ -3533,6 +3666,13 @@ async function consultarReniec(dniParam) {
       if (elAlergias) {
         elAlergias.value = masterReniec.alergias;
         actualizarIndicadorVisualAlergias(masterReniec.alergias);
+      }
+    }
+    if (masterReniec && (masterReniec.grupo_sanguineo || masterReniec.factor_rh)) {
+      const gsRaw = masterReniec.grupo_sanguineo && masterReniec.grupo_sanguineo !== "—" ? masterReniec.grupo_sanguineo : "";
+      const rhRaw = masterReniec.factor_rh && masterReniec.factor_rh !== "—" ? masterReniec.factor_rh : "";
+      if (typeof sincronizarGsYRhEnModulos === "function" && (gsRaw || rhRaw)) {
+        sincronizarGsYRhEnModulos(gsRaw, rhRaw);
       }
     }
   } catch (eMaster) {}
@@ -10100,12 +10240,20 @@ function imprimirOficioFiscaliaLevantamiento() {
   w.print();
 }
 
-function imprimirFacturaOficial() {
+function construirHTMLDocumentoLiquidacion() {
   const liq = calcularLiquidacionSeguro();
-  const w = window.open("", "_blank");
-  if (!w) { alert("Permita las ventanas emergentes para imprimir."); return; }
-  const fecha = new Date().toLocaleString();
-  const nombre = STATE.nombreReniec || STATE.identificador || "PACIENTE";
+  const fecha = new Date().toLocaleString("es-PE");
+  const esPacienteNN = Boolean(
+    STATE.esNN ||
+    String(STATE.identificador || "").toUpperCase().startsWith("NN") ||
+    String(STATE.nombreReniec || "").toUpperCase().includes("PACIENTE NN")
+  );
+  const nombreMostrar = esPacienteNN
+    ? "NN — Identidad Desconocida (No se sabe su nombre)"
+    : (STATE.nombreReniec || STATE.identificador || "—");
+  const seguroMostrar = esPacienteNN
+    ? "No determinado / Por regularizar (Paciente NN — No se sabe qué seguro tiene)"
+    : (STATE.tipoSeguro || liq.etiquetaRegimen || "Particular (Sin seguro)");
 
   let itemsHtml = "";
   STATE.items_factura.forEach((item, idx) => {
@@ -10119,16 +10267,16 @@ function imprimirFacturaOficial() {
     `;
   });
 
-  w.document.write(`
+  return `
     <html><head><title>Liquidación Hospitalaria Oficial - Ley N° 29414</title>
     <style>body{font-family:Arial,sans-serif;padding:30px;font-size:12px;line-height:1.4;}table{width:100%;border-collapse:collapse;margin-top:12px;}th{background:#f1f5f9;border:1px solid #cbd5e1;padding:8px 10px;text-align:left;}</style>
     </head><body>
       <h2 style="margin:0;color:#0f172a;">HOSPITAL REGIONAL DOCENTE UPP — COMPROBANTE DE LIQUIDACIÓN DE ATENCIÓN</h2>
       <h4 style="margin:0 0 10px 0;color:#475569;">AUDITORÍA FINANCIERA Y TRANSPARENCIA ASISTENCIAL (LEY N° 29414 - SUSALUD)</h4>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;padding:10px;border-radius:6px;">
-        <strong>Paciente:</strong> ${nombre} | <strong>Identificador:</strong> ${STATE.identificador} | <strong>HC:</strong> ${STATE.historiaClinica}<br>
-        <strong>Régimen Prestacional:</strong> ${liq.etiquetaRegimen} | <strong>Fecha de Liquidación:</strong> ${fecha}<br>
-        <strong>Lugar de Prestación:</strong> ${liq.lugarAtencion}
+        <strong>Nombre del Paciente:</strong> ${nombreMostrar} | <strong>Identificador:</strong> ${STATE.identificador || "—"} | <strong>HC:</strong> ${STATE.historiaClinica || "—"}<br>
+        <strong>Seguro:</strong> ${seguroMostrar} | <strong>Régimen Prestacional:</strong> ${liq.etiquetaRegimen}<br>
+        <strong>Fecha de Liquidación:</strong> ${fecha} | <strong>Lugar de Prestación:</strong> ${liq.lugarAtencion}
       </div>
       <table>
         <thead>
@@ -10154,7 +10302,15 @@ function imprimirFacturaOficial() {
         <div style="border-top:1px solid #000;width:220px;padding-top:4px;">Auditoría Médica UPP</div>
       </div>
     </body></html>
-  `);
+  `;
+}
+window.construirHTMLDocumentoLiquidacion = construirHTMLDocumentoLiquidacion;
+
+function imprimirFacturaOficial() {
+  const htmlDoc = construirHTMLDocumentoLiquidacion();
+  const w = window.open("", "_blank");
+  if (!w) { alert("Permita las ventanas emergentes para imprimir."); return; }
+  w.document.write(htmlDoc);
   w.document.close();
   w.print();
 }
@@ -12621,10 +12777,66 @@ if (document.readyState === 'loading') {
 window.advertirEntornoBloqueado = advertirEntornoBloqueado;
 window.resetearEntornoEstablecimientoAPendiente = resetearEntornoEstablecimientoAPendiente;
 
+function sincronizarGsYRhEnModulos(gsVal, rhVal) {
+  let gs = String(gsVal || "").trim();
+  let rh = String(rhVal || "").trim();
+  // Si viene combinado como "O+" o "AB-"
+  const mComb = gs.match(/^(AB|O|A|B)\s*([+-])$/i);
+  if (mComb) {
+    gs = mComb[1].toUpperCase();
+    rh = mComb[2] === "+" ? "Positivo (Rh+)" : "Negativo (Rh-)";
+  }
+  if (typeof STATE !== "undefined" && STATE) {
+    STATE.grupoSanguineo = gs;
+    STATE.factorRh = rh;
+  }
+  const elGs4 = document.getElementById("select_grupo_sanguineo");
+  if (elGs4) elGs4.value = gs;
+  const elRh4 = document.getElementById("select_factor_rh");
+  if (elRh4) elRh4.value = rh;
+
+  const elGs2 = document.getElementById("gsan_full");
+  if (elGs2) {
+    if (gs === "No se acuerda" || rh === "No se acuerda") {
+      elGs2.value = "No se acuerda";
+    } else if (["O", "A", "B", "AB"].includes(gs) && (rh.includes("+") || rh.includes("-"))) {
+      elGs2.value = `${gs}${rh.includes("+") ? "+" : "-"}`;
+    } else if (!gs && !rh) {
+      elGs2.value = "Desconocido";
+    }
+  }
+  const badge = document.getElementById("badge_gs_rh_estado");
+  if (badge) {
+    badge.textContent = (gs || rh) ? `${gs || "?"} ${rh || ""}`.trim() : "Por tipificar / Confirmar";
+  }
+  const alerta = document.getElementById("alerta_rh_negativo");
+  if (alerta) {
+    alerta.style.display = rh.includes("Negativo") ? "block" : "none";
+  }
+}
+window.sincronizarGsYRhEnModulos = sincronizarGsYRhEnModulos;
+
 function actualizarGrupoSanguineo(val) {
-  STATE.grupoSanguineo = val;
-  autoGuardarCambioEnHistoriaClinica(`Grupo sanguíneo actualizado a ${val}`);
-  guardarEnHistoriaClinicaMaster({ grupo_sanguineo: val });
+  let gs = "";
+  let rh = "";
+  if (val === "No se acuerda") {
+    gs = "No se acuerda";
+    rh = "No se acuerda";
+  } else if (val === "Desconocido" || !val) {
+    gs = "";
+    rh = "";
+  } else {
+    const m = String(val).match(/^(AB|O|A|B)\s*([+-])$/i);
+    if (m) {
+      gs = m[1].toUpperCase();
+      rh = m[2] === "+" ? "Positivo (Rh+)" : "Negativo (Rh-)";
+    } else {
+      gs = val;
+    }
+  }
+  sincronizarGsYRhEnModulos(gs, rh);
+  autoGuardarCambioEnHistoriaClinica(`Grupo sanguíneo actualizado a ${val || "Desconocido"}`);
+  guardarEnHistoriaClinicaMaster({ grupo_sanguineo: gs || "—", factor_rh: rh || "—" });
 }
 window.actualizarGrupoSanguineo = actualizarGrupoSanguineo;
 
@@ -14413,8 +14625,21 @@ function construirHTMLBrazalete(esTemporal = false) {
   let generoDisplay = (generoRaw && generoRaw !== "Desconocido") ? generoRaw : "desconocido";
 
   // GRUPO SANGUÍNEO Y FACTOR RH
-  let gsanRaw = STATE.grupoSanguineo || document.getElementById("gsan_full")?.value || "Desconocido";
-  let gsanDisplay = (gsanRaw && gsanRaw !== "Desconocido") ? gsanRaw : "Desconocido / Por tipificar";
+  let gsRaw = STATE.grupoSanguineo || document.getElementById("select_grupo_sanguineo")?.value || "";
+  let rhRaw = STATE.factorRh || document.getElementById("select_factor_rh")?.value || "";
+  if (!gsRaw && !rhRaw) {
+    const gsanM2 = document.getElementById("gsan_full")?.value || "";
+    const mComb = gsanM2.match(/^(AB|O|A|B)\s*([+-])$/i);
+    if (mComb) {
+      gsRaw = mComb[1].toUpperCase();
+      rhRaw = mComb[2] === "+" ? "Positivo (Rh+)" : "Negativo (Rh-)";
+    } else if (gsanM2 === "No se acuerda") {
+      gsRaw = "No se acuerda";
+      rhRaw = "No se acuerda";
+    }
+  }
+  const gsDisplay = (gsRaw && gsRaw !== "Desconocido") ? gsRaw : "Por tipificar";
+  const rhDisplay = (rhRaw && rhRaw !== "Desconocido") ? rhRaw : "Por tipificar";
 
   // CORRECCIÓN ALERGIAS: VISIBILIDAD GARANTIZADA Y REGLAS DE CONDICIÓN DE INGRESO
   const esAdmisionRapidaEmergencia = Boolean(
@@ -14484,7 +14709,8 @@ function construirHTMLBrazalete(esTemporal = false) {
             <span><strong>DOC:</strong> ${docPaciente}</span>
             <span><strong>EDAD:</strong> ${edadDisplay}</span>
             <span><strong>SEXO:</strong> ${generoDisplay}</span>
-            <span><strong>GS:</strong> <span style="background:#fee2e2; color:#991b1b; padding:1px 4px; border-radius:3px; font-weight:800;">${gsanDisplay}</span></span>
+            <span><strong>GS:</strong> <span style="background:#fee2e2; color:#991b1b; padding:1px 4px; border-radius:3px; font-weight:800;">${gsDisplay}</span></span>
+            <span><strong>RH:</strong> <span style="background:#fee2e2; color:#991b1b; padding:1px 4px; border-radius:3px; font-weight:800;">${rhDisplay}</span></span>
             <span><strong>ING:</strong> <span style="font-family:monospace; font-weight:700;">${fechaActual} ${horaActual}</span></span>
           </div>
         </div>
@@ -16535,18 +16761,7 @@ window.actualizarProcedimientoConsentimiento = actualizarProcedimientoConsentimi
 function actualizarGrupoYFactorRh() {
   const gs = document.getElementById("select_grupo_sanguineo")?.value || "";
   const rh = document.getElementById("select_factor_rh")?.value || "";
-  if (typeof STATE !== "undefined" && STATE) {
-    STATE.grupoSanguineo = gs;
-    STATE.factorRh = rh;
-  }
-  const badge = document.getElementById("badge_gs_rh_estado");
-  if (badge) {
-    badge.textContent = (gs || rh) ? `${gs || "?"} ${rh || "Rh por tipificar"}`.trim() : "Por tipificar / Confirmar";
-  }
-  const alerta = document.getElementById("alerta_rh_negativo");
-  if (alerta) {
-    alerta.style.display = rh.includes("Negativo") ? "block" : "none";
-  }
+  sincronizarGsYRhEnModulos(gs, rh);
   if (typeof PACIENTES_COLA !== "undefined" && Array.isArray(PACIENTES_COLA) && typeof pacienteActivoId !== "undefined") {
     const pxActivo = PACIENTES_COLA.find(x => x.id === pacienteActivoId);
     if (pxActivo && pxActivo.stateSnapshot) {
@@ -16564,6 +16779,9 @@ function actualizarGrupoYFactorRh() {
       allM[key].factor_rh = rh || "—";
       guardarPacientesMaster(allM);
     }
+  }
+  if (typeof guardarEnHistoriaClinicaMaster === "function") {
+    guardarEnHistoriaClinicaMaster({ grupo_sanguineo: gs || "—", factor_rh: rh || "—" });
   }
   if (typeof registrarLogAuditoria === "function" && (gs || rh)) {
     registrarLogAuditoria("Módulo 4", "INMUNOHEMATOLOGIA_GS_RH", `Grupo Sanguíneo: ${gs || "—"} | Factor Rh: ${rh || "—"}`);
